@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>逆水寒・江湖小島</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="world"></canvas>
+
+<!-- 1. 選門派 -->
+<section id="entry" class="screen">
+  <div class="card big">
+    <h1>江湖小島</h1>
+    <p class="sub">逆水寒好友的秘密基地 ・ 先選擇你的門派</p>
+    <div id="classGrid" class="classgrid"></div>
+    <p style="text-align:center;margin-bottom:0"><button id="recoverBtn" class="ghost">🔑 找回角色</button></p>
+  </div>
+</section>
+
+<!-- 2. 捏臉 -->
+<section id="creator" class="screen hidden">
+  <div class="card big creator">
+    <div class="preview"><canvas id="previewCanvas" width="360" height="420"></canvas><div id="prevTag" class="tag"></div></div>
+    <div class="opts">
+      <h2>捏個Q版俠客</h2>
+      <label>遊戲暱稱<input id="nameIn" maxlength="12" placeholder="輸入你的遊戲名稱"></label>
+      <div class="row"><span>髮型</span><div id="hairOpts" class="chips"></div></div>
+      <div class="row"><span>髮色</span><div id="hairColOpts" class="swatches"></div></div>
+      <div class="row"><span>服裝</span><div id="outfitOpts" class="chips"></div></div>
+      <div class="row"><span>衣色</span><div id="outfitColOpts" class="swatches"></div></div>
+      <div class="row"><span>膚色</span><div id="skinOpts" class="swatches"></div></div>
+      <label>密語 <small>(4 位數字，換裝置時用「暱稱＋密語」找回角色)</small><input id="pinIn" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="例如 1206"></label>
+      <label>給大家的留言 <small>(最多50字，送出後不可修改)</small>
+        <textarea id="msgIn" maxlength="50" rows="2" placeholder="想對大家說的話…"></textarea><small id="msgCount" class="count">0/50</small></label>
+      <div class="btns"><button id="backBtn" class="ghost">← 換門派</button><button id="enterBtn">踏入江湖 ✦</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="topbar">
+    <div id="place" class="pill">汴京</div>
+    <button id="dayBtn" class="pill">☀️ 白天</button>
+    <button id="seasonBtn" class="pill">🌸 春</button>
+    <button id="helpBtn" class="pill">❔</button>
+  </div>
+  <div class="emotes">
+    <button data-emote="bow">🙏<span>抱拳</span></button>
+    <button data-emote="wave">👋<span>揮手</span></button>
+    <button data-emote="sit">🪑<span>坐下</span></button>
+    <button data-emote="meditate">🧘<span>打坐</span></button>
+    <button id="attackBtn" class="hidden" data-emote="attack">⚔️<span>攻擊</span></button>
+  </div>
+  <div class="travel">
+    <button data-go="main">汴京</button><button data-go="peach">桃溪村</button><button data-go="mount">三清山</button><button data-go="maple">楓林小駐</button><button data-go="temple">孔廟</button>
+  </div>
+</div>
+
+<div id="kick" class="kick hidden"><b>⚽ 踢 醉落嫣紅 進香爐</b>
+  <div class="krow"><button id="kL">◀</button><span>方向 <b id="kang">0°</b></span><button id="kR">▶</button></div>
+  <div class="meter"><div id="kpow"></div></div>
+  <div class="krow"><button id="kCharge">按住蓄力</button><button id="kX" class="ghost">離開</button></div></div>
+<div id="toast" class="toast hidden"></div>
+<div id="modal" class="modal hidden"><div class="card mcard"><button class="x" id="modalX">✕</button><div id="modalBody"></div></div></div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
