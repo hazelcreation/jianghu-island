@@ -24,12 +24,16 @@ export const db = {
   async recover(name, pin) {
     let r; try { r = await rpc('recover_character', { p_name: name, p_pin_hash: await this.hashPin(name, pin) }); }
     catch (e) { if (/TOO_MANY/.test(e.msg)) throw new Error('TOO_MANY_ATTEMPTS'); throw e; }
-    if (!r?.length) return null; local.set('me', r[0].id); return toAv(r[0]); },
+    if (!r?.length) return null; local.set('me', r[0].id); local.set('ph', await this.hashPin(name, pin)); return toAv(r[0]); },
   async createAvatar(a) {
     const { pin, name, message, cls, pos, id: _i, created: _c, ...appearance } = a;
     let r; try { r = await rpc('create_character', { p_name: name, p_cls: cls, p_appearance: appearance, p_message: (message || '').slice(0, 50), p_pin_hash: await this.hashPin(name, pin) }); }
     catch (e) { if (/NAME_TAKEN/.test(e.msg) || e.code === '23505') throw new Error('NAME_TAKEN'); throw e; }
-    const av = toAv(r[0]); local.set('me', av.id); if (pos) await this.updateAppearance(av.id, { pos }); return { ...av, pos }; },
+    const av = toAv(r[0]); local.set('me', av.id); local.set('ph', await this.hashPin(name, pin)); if (pos) await this.updateAppearance(av.id, { pos }); return { ...av, pos }; },
+  hasPin() { return !!local.get('ph', null); },
+  async updateMessage(name, message, pin) { const ph = pin ? await this.hashPin(name, pin) : local.get('ph', null); if (!ph) throw new Error('NEED_PIN');
+    let r; try { r = await rpc('update_message', { p_name: name, p_pin_hash: ph, p_message: message.slice(0, 50) }); } catch (e) { if (/TOO_MANY/.test(e.msg)) throw new Error('TOO_MANY_ATTEMPTS'); throw e; }
+    if (r == null) { local.set('ph', null); throw new Error('BAD_PIN'); } local.set('ph', ph); return r; },
   async updateAppearance(id, patch) { if (patch.pos) { const p = local.get('pos', {}); p[id] = patch.pos; local.set('pos', p); } return null; },
   async listAvatars() { return (await api(`characters?select=${CHAR_COLS}&order=created_at.asc&limit=500`)).map(toAv); },
   async recordDraw(id, result) { const r = await rpc('record_draw', { p_character_id: id, p_result: result }); return r[0]; },
@@ -45,5 +49,5 @@ export const db = {
     const r = await api('photos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ storage_path: path, title: p.title.slice(0, 20), caption: (p.caption || '').slice(0, 50), uploader: (p.name || '').slice(0, 12) }) });
     return photo(r[0]); },
   async listPhotos() { return (await api('photos?select=id,storage_path,title,caption,uploader,created_at&order=created_at.desc&limit=100')).map(photo); },
-  async resetAll() { Object.keys(localStorage).filter(k => k.startsWith(P)).forEach(k => localStorage.removeItem(k)); },
+  async resetAll() { localStorage.removeItem(P + 'ph'); Object.keys(localStorage).filter(k => k.startsWith(P)).forEach(k => localStorage.removeItem(k)); },
 };

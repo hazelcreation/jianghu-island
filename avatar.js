@@ -34,10 +34,19 @@ function weapon(cls, color, parts) {
       rib.scale.set(1, 1, 1); parts.root.add(rib); parts.ribbon = rib;
       hand.add(M(new THREE.SphereGeometry(.1), gold)); break; }
     case 'suimeng': { const g = new THREE.Group(); g.add(M(new THREE.BoxGeometry(.1, 1.5, .04), steel, 0, .9, 0)); g.add(M(new THREE.BoxGeometry(.36, .07, .12), c, 0, .14, 0)); g.add(M(new THREE.CylinderGeometry(.05, .05, .34), c, 0, -.06, 0)); g.rotation.x = Math.PI / 2.3; hand.add(g); break; }
-    case 'jiuling': { const g = new THREE.Group(); g.add(M(new THREE.CylinderGeometry(.02, .02, .3), brown, 0, -.15, 0)); g.add(M(new THREE.ConeGeometry(.2, .1, 8), c, 0, -.32, 0));
-      const lamp = M(new THREE.SphereGeometry(.2, 12, 10), new THREE.MeshBasicMaterial({ color: '#e9d5ff' }), 0, -.52, 0); lamp.scale.y = 1.2; g.add(lamp);
-      g.add(M(new THREE.SphereGeometry(.09), new THREE.MeshBasicMaterial({ color: '#c084fc' }), 0, -.52, 0));
-      g.add(M(new THREE.CylinderGeometry(.12, .16, .07, 8), c, 0, -.76, 0)); hand.add(g); parts.lamp = g; break; }
+    case 'jiuling': { // 魂燈：背在背上的大燈籠
+      const g = new THREE.Group(); g.position.set(.42, .45, -.1); g.rotation.set(-.1, 0, -.28); g.scale.setScalar(1.35); back.add(g);
+      g.add(M(new THREE.CylinderGeometry(.025, .025, .9), brown, 0, .1, .02)); // 背架
+      g.add(M(new THREE.ConeGeometry(.42, .2, 10), c, 0, .66, 0));
+      g.add(M(new THREE.SphereGeometry(.07, 8, 6), gold, 0, .8, 0));
+      const lamp = M(new THREE.SphereGeometry(.42, 16, 12), new THREE.MeshBasicMaterial({ color: '#eee4ff', transparent: true, opacity: .92 }), 0, .3, 0); lamp.scale.y = 1.15; lamp.castShadow = false; g.add(lamp);
+      for (let i = 0; i < 6; i++) { const r = M(new THREE.TorusGeometry(.43, .015, 4, 20), c, 0, .3, 0); r.rotation.y = i * Math.PI / 6; r.scale.y = 1.15; g.add(r); }
+      g.add(M(new THREE.SphereGeometry(.17, 12, 10), new THREE.MeshBasicMaterial({ color: '#a8d8ff' }), 0, .3, 0));
+      const halo = new THREE.Mesh(new THREE.SphereGeometry(.7, 16, 12), new THREE.MeshBasicMaterial({ color: '#cdb8ff', transparent: true, opacity: .18, depthWrite: false, blending: THREE.AdditiveBlending })); halo.position.y = .3; g.add(halo);
+      g.add(M(new THREE.CylinderGeometry(.22, .28, .1, 10), c, 0, -.1, 0));
+      for (const x of [-.12, 0, .12]) g.add(M(new THREE.CylinderGeometry(.025, .01, .38, 5), toon('#d9c8ff'), x, -.34, 0));
+      const pl = new THREE.PointLight('#c9b6ff', 1.2, 3); pl.position.y = .3; g.add(pl);
+      parts.lamp = g; parts.lampHalo = halo; break; }
     case 'tieyi': { for (const h of [hand, handL]) { h.add(M(new THREE.BoxGeometry(.36, .32, .36), c)); for (let i = -1; i <= 1; i++) h.add(M(new THREE.SphereGeometry(.06), brown, i * .11, -.16, .12)); } break; }
     case 'xuehe': { const g = new THREE.Group(); g.add(M(new THREE.CylinderGeometry(.04, .04, 2.6), brown, 0, .5, 0)); g.add(M(new THREE.ConeGeometry(.1, .4, 6), steel, 0, 1.98, 0)); g.add(M(new THREE.SphereGeometry(.12, 8, 6), c, 0, 1.72, 0)); g.rotation.x = Math.PI / 2.2; hand.add(g); break; }
     case 'shenxiang': { const q = new THREE.Group(); q.add(M(new THREE.BoxGeometry(.5, 1.3, .1), c)); for (let i = -2; i <= 2; i++) q.add(M(new THREE.BoxGeometry(.015, 1.2, .02), gold, i * .08, 0, .06)); q.rotation.z = .5; back.add(q); break; }
@@ -116,6 +125,7 @@ export class Avatar {
       case 'attack': { const ph = (st * 3) % 1; const sw = ph < .4 ? -2.8 * (ph / .4) : -2.8 + 3.8 * Math.min(1, (ph - .4) / .2);
         p.armR.rotation.set(sw, 0, .3); p.torso.rotation.y = ph < .4 ? .3 : -.4; p.body.rotation.x = ph > .4 && ph < .7 ? .12 : 0; if (st > 2) this.setState('idle'); break; }
     }
+    if (p.lampHalo) { p.lampHalo.material.opacity = .09 + Math.sin(t * 2.5) * .04; p.lamp.rotation.z = Math.sin(t * 2) * .04; }
     if (p.ribbon) p.ribbon.rotation.y = t * .8;
     if (p.pearl) p.pearl.position.set(Math.cos(t * 2) * .9, 1.6 + Math.sin(t * 3) * .15, Math.sin(t * 2) * .9);
     if (p.wings) p.wings.forEach((w, i) => w.rotation.y = (i ? -1 : 1) * (.2 + Math.sin(t * 3) * .15));

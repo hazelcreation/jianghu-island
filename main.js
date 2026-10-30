@@ -229,14 +229,14 @@ let prev; function buildCreator() {
   if (!prev) { const r = new THREE.WebGLRenderer({ canvas: $('#previewCanvas'), antialias: true, alpha: true }); r.setPixelRatio(2); r.outputColorSpace = THREE.SRGBColorSpace; const s = new THREE.Scene(); s.add(new THREE.HemisphereLight('#fff', '#ccc', 1.4)); const dl = new THREE.DirectionalLight('#fff', 1.6); dl.position.set(3, 5, 6); s.add(dl);
     const cam = new THREE.PerspectiveCamera(32, 360 / 420, .1, 50); cam.position.set(0, 2.2, 8); cam.lookAt(0, 1.55, 0); prev = { r, s, cam, av: null, running: false }; }
   if (!prev.running) { prev.running = true; const { r, s, cam } = prev;
-    (function pl() { if ($('#creator').classList.contains('hidden')) { prev.running = false; return; } requestAnimationFrame(pl); const t = performance.now() / 1000; if (prev.av) { prev.av.root.rotation.y = Math.sin(t * .7) * .8; prev.av.update(.016, t); } r.render(s, cam); })(); }
+    (function pl() { if ($('#creator').classList.contains('hidden')) { prev.running = false; return; } requestAnimationFrame(pl); const t = performance.now() / 1000; if (prev.av) { prev.av.root.rotation.y = window.__prevRot ?? Math.sin(t * .7) * .8; prev.av.update(.016, t); } r.render(s, cam); })(); }
   if (prev.av) prev.s.remove(prev.av.root); prev.av = new Avatar({ ...draft, name: '' }); prev.av.tag.visible = false; prev.s.add(prev.av.root); }
 $('#nameIn').oninput = () => buildCreator();
 $('#msgIn').oninput = e => $('#msgCount').textContent = `${e.target.value.length}/50`;
 $('#backBtn').onclick = () => { $('#creator').classList.add('hidden'); $('#entry').classList.remove('hidden'); showPanel('pickCls'); };
 $('#enterBtn').onclick = async () => { const name = $('#nameIn').value.trim(), message = $('#msgIn').value.trim(); if (!name) return toast('請輸入遊戲暱稱'); if (!message) return toast('寫一句話給大家吧～');
   const pin = $('#pinIn').value.trim(); if (!/^\d{4}$/.test(pin)) return toast('密語請輸入 4 位數字'); if (await db.nameTaken(name)) return toast('這個暱稱已經有人使用了，換一個吧');
-  if (!confirm(`留言送出後無法修改喔！\n\n「${message}」\n\n確定踏入江湖？`)) return;
+  if (!confirm(`「${message}」\n\n（留言之後可隨時修改）確定踏入江湖？`)) return;
   try { me = await db.createAvatar({ ...draft, name, message, pin, pos: [0, 0, 10] }); } catch (e) { return toast(e.message === 'NAME_TAKEN' ? '這個暱稱已經有人使用了' : '連線失敗，請稍後再試'); } $('#creator').classList.add('hidden'); startWorld(); };
 
 async function startWorld() { for (const a of await db.listAvatars()) { if (a.id === me.id) continue; spawn(a); }
@@ -254,9 +254,17 @@ $('#rGo').onclick = async () => { const name = $('#rName').value.trim(), pin = $
   if (!a) return toast('遊戲名稱或密語不正確');
   me = a; $('#entry').classList.add('hidden'); startWorld(); };
 $('#rPin').onkeydown = e => { if (e.key === 'Enter') $('#rGo').click(); };
+// 修改留言
+$('#msgBtn').onclick = () => { if (!me) return; const need = !db.hasPin();
+  modal(`<h2>✏️ 修改留言</h2><div class="form"><textarea id="emIn" maxlength="50" rows="3">${esc(me.message || '')}</textarea><small id="emc" class="count">${(me.message || '').length}/50</small>${need ? '<input id="emPin" type="password" inputmode="numeric" maxlength="4" placeholder="請輸入 4 位數密語">' : ''}<button id="emGo">儲存</button></div>`);
+  $('#emIn').oninput = e => $('#emc').textContent = `${e.target.value.length}/50`;
+  $('#emGo').onclick = async () => { const msg = $('#emIn').value.trim(); if (!msg) return toast('留言不能是空的喔'); const pin = $('#emPin')?.value.trim();
+    if (need && !/^\d{4}$/.test(pin || '')) return toast('密語請輸入 4 位數字');
+    try { me.message = await db.updateMessage(me.name, msg, pin); if (player) player.data.message = me.message; closeModal(); toast('留言已更新 ✦'); }
+    catch (e) { toast(e.message === 'BAD_PIN' ? '密語不正確' + (need ? '' : '，請重新輸入') : e.message === 'TOO_MANY_ATTEMPTS' ? '嘗試太多次了，請 10 分鐘後再試' : '連線失敗，請稍後再試'); if (e.message === 'BAD_PIN' && !need) $('#msgBtn').click(); } }; };
 // 每 15 秒同步其他俠客與紙船
 async function syncOthers() { if (!me) return; try { const known = new Set(avatars.map(a => a.data?.id));
-  for (const a of await db.listAvatars()) if (a.id !== me.id && !known.has(a.id)) spawn(a);
+  for (const a of await db.listAvatars()) { if (a.id === me.id) continue; if (!known.has(a.id)) spawn(a); else { const av = avatars.find(x => x.data?.id === a.id); if (av) av.data.message = a.message; } }
   if (world.boatGroup.children.length !== (await db.listWishes()).slice(0, 20).length) await refreshBoats(); } catch (e) { console.warn('sync', e); } }
 setInterval(syncOthers, 15000);
 applySeason(); updDayBtn(); buildEntry(); loop();
