@@ -27,7 +27,10 @@ function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w
 function weapon(cls, color, parts) {
   const brown = toon('#5a3b2e'), gold = toon('#f2c14e'), steel = toon('#e8eef8');
   const c = toon(color);
-  const back = new THREE.Group(); back.position.set(0, 1.0, -0.42); parts.torso.add(back);
+  // 長髮／馬尾會蓋住背後武器：依髮型把背掛點往後、往上推（渲染時計算，舊角色自動套用）
+  const bigHair = parts.hair === 'long' || parts.hair === 'pony';
+  const back = new THREE.Group(); back.position.set(0, bigHair ? 1.08 : 1.0, bigHair ? -0.74 : -0.42); parts.torso.add(back);
+  if (bigHair && ['shenxiang', 'longyin', 'xuanji', 'jiuling'].includes(cls)) { const strap = M(new THREE.BoxGeometry(.06, .06, .34), brown, 0, 0, .17); back.add(strap); }
   const hand = new THREE.Group(); hand.position.set(0, -0.62, 0); parts.armR.add(hand);
   const handL = new THREE.Group(); handL.position.set(0, -0.62, 0); parts.armL.add(handL);
   switch (cls) {
@@ -97,10 +100,10 @@ export class Avatar {
       case 'bun': head.add(M(new THREE.SphereGeometry(.28, 12, 10), hairM, 0, .7, -.12)); head.add(rot(M(new THREE.TorusGeometry(.2, .04, 6, 14), trim, 0, .58, -.1), Math.PI / 2)); break;
       case 'twin': for (const sd of [-1, 1]) { head.add(M(new THREE.SphereGeometry(.22, 12, 10), hairM, sd * .48, .48, -.05)); head.add(M(new THREE.SphereGeometry(.07), trim, sd * .4, .36, .12)); } break;
       case 'pony': { head.add(M(new THREE.SphereGeometry(.12), trim, 0, .5, -.5)); const p = M(new THREE.ConeGeometry(.22, 1.0, 10), hairM, 0, .1, -.78); p.rotation.x = -2.6; head.add(p); this.pony = p; break; }
-      case 'long': { const l = M(new THREE.CylinderGeometry(.5, .62, 1.2, 14, 1, true, Math.PI * .5, Math.PI), hairM, 0, -.45, -.08); l.material = toon(d.hairColor, { side: THREE.DoubleSide }); head.add(l); head.add(M(new THREE.BoxGeometry(.9, .06, .06), trim, 0, .45, -.35)); break; }
+      case 'long': { const l = M(new THREE.CylinderGeometry(.5, .62, 1.2, 14, 1, true, Math.PI * .5, Math.PI), hairM, 0, -.4, -.08); l.scale.set(.94, .9, .72); l.material = toon(d.hairColor, { side: THREE.DoubleSide }); head.add(l); head.add(M(new THREE.BoxGeometry(.9, .06, .06), trim, 0, .45, -.35)); break; }
       case 'short': for (let i = -2; i <= 2; i++) { const s = M(new THREE.ConeGeometry(.12, .3, 6), hairM, i * .2, .5, .3); s.rotation.x = .9; head.add(s); } break;
     }
-    this.parts = { root, body, torso, head, armL, armR, legL, legR };
+    this.parts = { root, body, torso, head, armL, armR, legL, legR, hair: d.hair };
     weapon(this.cls.id, this.cls.color, this.parts);
     const sh = new THREE.Mesh(new THREE.CircleGeometry(.6, 20), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: .18 })); sh.rotation.x = -Math.PI / 2; sh.position.y = .02; root.add(sh);
     this.aura = new THREE.Mesh(new THREE.TorusGeometry(.9, .04, 8, 40), new THREE.MeshBasicMaterial({ color: this.cls.color, transparent: true, opacity: .7 })); this.aura.rotation.x = Math.PI / 2; this.aura.visible = false; root.add(this.aura);
