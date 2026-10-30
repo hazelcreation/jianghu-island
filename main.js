@@ -314,7 +314,7 @@ let prev; function buildCreator() {
   const chips = (sel, arr, key) => { $(sel).innerHTML = arr.map(o => `<button data-v="${o.id}" class="${draft[key] === o.id ? 'on' : ''}">${o.n}</button>`).join(''); $(sel).querySelectorAll('button').forEach(b => b.onclick = () => { draft[key] = b.dataset.v; buildCreator(); }); };
   const sw = (sel, arr, key) => { $(sel).innerHTML = arr.map(c => `<i style="background:${c}" data-v="${c}" class="${draft[key] === c ? 'on' : ''}"></i>`).join(''); $(sel).querySelectorAll('i').forEach(b => b.onclick = () => { draft[key] = b.dataset.v; buildCreator(); }); };
   chips('#hairOpts', HAIRS, 'hair'); chips('#outfitOpts', OUTFITS, 'outfit'); sw('#hairColOpts', HAIR_COLORS, 'hairColor'); sw('#outfitColOpts', OUTFIT_COLORS, 'outfitColor'); sw('#skinOpts', SKIN_COLORS, 'skin');
-  const c = classById(draft.cls), tag = $('#prevTag'); tag.textContent = ($('#nameIn').value || '你的名字') + ` ・ ${c.name}`; tag.style.background = c.color; tag.style.color = c.text || '#fff';
+  const c = classById(draft.cls), tag = $('#prevTag'); tag.textContent = (lookEdit ? me.name : $('#nameIn').value || '你的名字') + ` ・ ${c.name}`; tag.style.background = c.color; tag.style.color = c.text || '#fff';
   if (!prev) { const r = new THREE.WebGLRenderer({ canvas: $('#previewCanvas'), antialias: true, alpha: true }); r.setPixelRatio(2); r.outputColorSpace = THREE.SRGBColorSpace; const s = new THREE.Scene(); s.add(new THREE.HemisphereLight('#fff', '#ccc', 1.4)); const dl = new THREE.DirectionalLight('#fff', 1.6); dl.position.set(3, 5, 6); s.add(dl);
     const cam = new THREE.PerspectiveCamera(32, 360 / 420, .1, 50); cam.position.set(0, 2.2, 8); cam.lookAt(0, 1.55, 0); prev = { r, s, cam, av: null, running: false }; }
   if (!prev.running) { prev.running = true; const { r, s, cam } = prev;
@@ -362,6 +362,7 @@ function startRealtime() { rt = connectRealtime(me, {
     // always walk (never teleport) toward the sender's target / reported position so facing follows real displacement
     a.target = m.tx != null ? new THREE.Vector3(m.tx, 0, m.tz) : (Math.hypot(p.x - m.x, p.z - m.z) > .05 ? new THREE.Vector3(m.x, 0, m.z) : null);
     if (!a.target && m.s && a.state !== m.s && ['sit', 'meditate'].includes(m.s)) a.setState(m.s); },
+  look: m => { const a = byId(m.id); if (!a || a.isMe || !m.look) return; applyLook(a, pickLook(m.look)); },
   emote: m => { const a = byId(m.id); if (!a || a.isMe) return; a.target = null; a.root.position.set(m.x, heightAt(m.x, m.z), m.z); a.setState(m.s); },
   act: m => { const s = byId(m.from), d = m.to === me.id ? player : byId(m.to); if (!s || !d) return; s.root.position.set(m.x, heightAt(m.x, m.z), m.z); s.target = null; playAct(s, d, m.type); },
 }); }
@@ -375,6 +376,19 @@ $('#rGo').onclick = async () => { const name = $('#rName').value.trim(), pin = $
   if (!a) return toast('遊戲名稱或密語不正確');
   me = a; $('#entry').classList.add('hidden'); startWorld(); };
 $('#rPin').onkeydown = e => { if (e.key === 'Enter') $('#rGo').click(); };
+// 換裝（沿用捏臉預覽；職業不可改；用本機已存的登入憑證驗證）
+const LOOK_KEYS = ['hair', 'hairColor', 'outfit', 'outfitColor', 'skin']; let lookEdit = false;
+const pickLook = o => Object.fromEntries(LOOK_KEYS.map(k => [k, o[k]]));
+function applyLook(av, look) { if (!av) return; Object.assign(av.data, look); if (av.bubble) av.bubble = null; av.build(); av.setTag({}); }
+$('#lookBtn').onclick = () => { if (!me) return; if (!db.hasPin()) return toast('請重新登島');
+  lookEdit = true; Object.assign(draft, { cls: me.cls, hair: me.hair || 'bun', outfit: me.outfit || 'robe', hairColor: me.hairColor || HAIR_COLORS[0], outfitColor: me.outfitColor || OUTFIT_COLORS[0], skin: me.skin || SKIN_COLORS[0] });
+  $('#crTitle').textContent = '👘 換裝'; $('#creator').classList.add('editing'); $('#creator').classList.remove('hidden'); buildCreator(); };
+const endLook = () => { lookEdit = false; $('#creator').classList.add('hidden'); $('#creator').classList.remove('editing'); $('#crTitle').textContent = '捏個Q版俠客'; };
+$('#lookCancel').onclick = endLook;
+$('#lookSave').onclick = async () => { const look = pickLook(draft); const btn = $('#lookSave'); btn.disabled = true;
+  try { const r = await db.updateLook(me.name, look); Object.assign(me, pickLook(r)); applyLook(player, pickLook(r)); rt?.bcast('look', { id: me.id, look: pickLook(r) }); endLook(); toast('換裝完成 ✦'); }
+  catch (e) { toast(e.message === 'BAD_PIN' || e.message === 'NEED_PIN' ? '請重新登島' : e.message === 'BANNED' ? '此角色已被封禁' : e.message === 'TOO_MANY_ATTEMPTS' ? '嘗試太多次了，請 10 分鐘後再試' : '儲存失敗，請稍後再試'); }
+  finally { btn.disabled = false; } };
 // 修改留言
 $('#msgBtn').onclick = () => { if (!me) return; const need = !db.hasPin();
   modal(`<h2>✏️ 修改留言</h2><div class="form"><textarea id="emIn" maxlength="50" rows="3">${esc(me.message || '')}</textarea><small id="emc" class="count">${(me.message || '').length}/50</small>${need ? '<input id="emPin" type="password" inputmode="numeric" maxlength="4" placeholder="請輸入 4 位數密語">' : ''}<button id="emGo">儲存</button></div>`);
@@ -385,7 +399,7 @@ $('#msgBtn').onclick = () => { if (!me) return; const need = !db.hasPin();
     catch (e) { toast(e.message === 'BAD_PIN' ? '密語不正確' + (need ? '' : '，請重新輸入') : e.message === 'TOO_MANY_ATTEMPTS' ? '嘗試太多次了，請 10 分鐘後再試' : '連線失敗，請稍後再試'); if (e.message === 'BAD_PIN' && !need) $('#msgBtn').click(); } }; };
 // 每 15 秒同步其他俠客與紙船
 async function syncOthers() { if (!me) return; try { const list = await db.listAvatars(); if (!list.some(a => a.id === me.id)) { const still = await db.getMe(); return kickBanned(still ? undefined : '此角色已被管理員刪除。'); } for (const a of [...avatars]) if (!a.isMe && a.data?.id && !list.some(x => x.id === a.data.id)) removeAvatar(a.data.id); const known = new Set(avatars.map(a => a.data?.id));
-  for (const a of list) { if (a.id === me.id) continue; if (!known.has(a.id)) { known.add(a.id); spawn(a); } else { const av = avatars.find(x => x.data?.id === a.id); if (av) av.data.message = a.message; } }
+  for (const a of list) { if (a.id === me.id) continue; if (!known.has(a.id)) { known.add(a.id); spawn(a); } else { const av = avatars.find(x => x.data?.id === a.id); if (av) { av.data.message = a.message; if (LOOK_KEYS.some(k => (av.data[k] || null) !== (a[k] || null))) applyLook(av, pickLook(a)); } } }
   if (world.boatGroup.children.length !== (await db.listWishes()).slice(0, 20).length) await refreshBoats(); await refreshFlowers(); } catch (e) { console.warn('sync', e); } }
 setInterval(syncOthers, 15000);
 applySeason(); updDayBtn(); buildEntry(); loop();

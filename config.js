@@ -35,10 +35,10 @@ export const GACHA = [
   { name:'內功肥料', p:17, icon:'🌱' },
 ];
 
-export const HAIRS   = [{id:'bun',n:'丸子頭'},{id:'twin',n:'雙髻'},{id:'pony',n:'高馬尾'},{id:'long',n:'飄逸長髮'},{id:'short',n:'俐落短髮'}];
-export const OUTFITS = [{id:'robe',n:'長袍'},{id:'short',n:'短打勁裝'},{id:'cape',n:'斗篷俠客'}];
-export const HAIR_COLORS = ['#2b1d16','#5a3b2e','#a0522d','#e8d8c0','#c0c0d0','#d9667a'];
-export const OUTFIT_COLORS = ['#ffffff','#f6d6de','#bfe3f5','#d8f0c8','#fbe7a1','#e7d3f7','#3a3f58','#c94a4a'];
+export const HAIRS   = [{id:'bun',n:'丸子頭'},{id:'twin',n:'雙髻'},{id:'pony',n:'高馬尾'},{id:'long',n:'飄逸長髮'},{id:'short',n:'俐落短髮'},{id:'halfup',n:'半紮半披'},{id:'twintail',n:'雙馬尾'},{id:'braid',n:'長辮'},{id:'buyao',n:'髮髻步搖'}];
+export const OUTFITS = [{id:'robe',n:'長袍'},{id:'short',n:'短打勁裝'},{id:'cape',n:'斗篷俠客'},{id:'ruqun',n:'襦裙'},{id:'armor',n:'輕甲'},{id:'scholar',n:'書生寬袖'},{id:'furcape',n:'毛領披風'}];
+export const HAIR_COLORS = ['#2b1d16','#5a3b2e','#a0522d','#e8d8c0','#c0c0d0','#d9667a','#1F4D3A','#2F3E6B','#7A2F45','#D4A34A'];  // 新增：深綠、墨藍、酒紅、金棕
+export const OUTFIT_COLORS = ['#ffffff','#f6d6de','#bfe3f5','#d8f0c8','#fbe7a1','#e7d3f7','#3a3f58','#c94a4a','#1f4d3a','#f2a65a'];
 export const SKIN_COLORS = ['#ffe3d0','#f7d0b5','#e8b896','#c98e6b'];
 
 // 各職業頭上對話泡泡台詞（空陣列＝暫不說話）

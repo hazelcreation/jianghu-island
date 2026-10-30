@@ -38,7 +38,7 @@ function weapon(cls, color, parts) {
   const brown = toon('#5a3b2e'), gold = toon('#f2c14e'), steel = toon('#e8eef8');
   const c = toon(color);
   // 長髮／馬尾會蓋住背後武器：依髮型把背掛點往後、往上推（渲染時計算，舊角色自動套用）
-  const bigHair = parts.hair === 'long' || parts.hair === 'pony';
+  const bigHair = ['long', 'pony', 'halfup', 'braid', 'twintail'].includes(parts.hair);
   const back = new THREE.Group(); back.position.set(0, bigHair ? 1.08 : 1.0, bigHair ? -0.74 : -0.42); parts.torso.add(back);
   if (bigHair && ['shenxiang', 'longyin', 'xuanji', 'jiuling'].includes(cls)) { const strap = M(new THREE.BoxGeometry(.06, .06, .34), brown, 0, 0, .17); back.add(strap); }
   const hand = new THREE.Group(); hand.position.set(0, -0.62, 0); parts.armR.add(hand);
@@ -88,14 +88,21 @@ export class Avatar {
     const skin = toon(d.skin), hairM = toon(d.hairColor), cloth = toon(d.outfitColor), trim = toon(this.cls.color), dark = toon('#2b1d16'), shoe = toon('#5a3b2e');
     const body = new THREE.Group(); root.add(body); this.body = body;
     const legL = new THREE.Group(), legR = new THREE.Group(); legL.position.set(-.17, .55, 0); legR.position.set(.17, .55, 0);
-    for (const l of [legL, legR]) { l.add(M(new THREE.CylinderGeometry(.11, .12, .45, 8), d.outfit === 'short' ? toon(darken(d.outfitColor, .7)) : cloth, 0, -.22, 0)); l.add(M(new THREE.SphereGeometry(.15, 8, 6), shoe, 0, -.46, .04)); body.add(l); }
+    for (const l of [legL, legR]) { l.add(M(new THREE.CylinderGeometry(.11, .12, .45, 8), ['short', 'armor'].includes(d.outfit) ? toon(darken(d.outfitColor, .7)) : cloth, 0, -.22, 0)); l.add(M(new THREE.SphereGeometry(.15, 8, 6), shoe, 0, -.46, .04)); body.add(l); }
     const torso = new THREE.Group(); torso.position.y = .55; body.add(torso);
-    const robeLen = d.outfit === 'robe' ? .85 : .6;
-    const robe = M(new THREE.CylinderGeometry(.3, d.outfit === 'robe' ? .52 : .4, robeLen, 12), cloth, 0, .62 - robeLen / 2 + .25, 0); torso.add(robe);
+    const longO = ['robe', 'scholar', 'ruqun'].includes(d.outfit), robeLen = d.outfit === 'ruqun' ? .95 : longO ? .85 : .6;
+    const robe = M(new THREE.CylinderGeometry(.3, longO ? .52 : .4, robeLen, 12), cloth, 0, .62 - robeLen / 2 + .25, 0); torso.add(robe);
     torso.add(M(new THREE.CylinderGeometry(.33, .33, .1, 12), trim, 0, .48, 0)); // 腰帶
     torso.add(M(new THREE.BoxGeometry(.08, .3, .02), trim, 0, .72, .29)); // 衣襟
     if (d.outfit === 'cape') { const cape = M(new THREE.CylinderGeometry(.42, .62, .95, 12, 1, true, Math.PI * .6, Math.PI * .8), toon(darken(d.outfitColor, .6), { side: THREE.DoubleSide }), 0, .45, 0); torso.add(cape); torso.add(rot(M(new THREE.TorusGeometry(.33, .07, 6, 14), trim, 0, .9, 0), Math.PI / 2)); }
-    const arm = sd => { const a = new THREE.Group(); a.position.set(sd * .36, .9, 0); a.add(M(new THREE.CylinderGeometry(.1, .13, .5, 8), cloth, 0, -.25, 0)); a.add(M(new THREE.SphereGeometry(.11, 8, 6), skin, 0, -.55, 0)); a.rotation.z = sd * .25; torso.add(a); return a; };
+    if (d.outfit === 'furcape') { const cape = M(new THREE.CylinderGeometry(.42, .64, .95, 12, 1, true, Math.PI * .6, Math.PI * .8), toon(darken(d.outfitColor, .6), { side: THREE.DoubleSide }), 0, .45, 0); torso.add(cape); const fur = M(new THREE.TorusGeometry(.32, .12, 8, 16), toon('#fbf6ee'), 0, .92, 0); fur.rotation.x = Math.PI / 2; torso.add(fur); }
+    if (d.outfit === 'ruqun') { torso.add(M(new THREE.CylinderGeometry(.31, .33, .1, 12), toon('#fffaf3'), 0, .8, 0)); const pb = M(new THREE.TorusGeometry(.48, .03, 6, 24, Math.PI), trim, 0, .6, -.05); pb.rotation.set(0, 0, Math.PI); torso.add(pb); }
+    if (d.outfit === 'armor') { torso.add(M(new THREE.BoxGeometry(.46, .34, .08), toon('#c9d2dc'), 0, .76, .28)); torso.add(M(new THREE.BoxGeometry(.46, .3, .06), toon('#aab4c0'), 0, .76, -.28)); }
+    if (d.outfit === 'scholar') { torso.add(M(new THREE.BoxGeometry(.4, .06, .02), trim, 0, .86, .29)); }
+    const arm = sd => { const a = new THREE.Group(); a.position.set(sd * .36, .9, 0); a.add(M(new THREE.CylinderGeometry(.1, .13, .5, 8), cloth, 0, -.25, 0)); a.add(M(new THREE.SphereGeometry(.11, 8, 6), skin, 0, -.55, 0)); a.rotation.z = sd * .25; torso.add(a);
+      if (d.outfit === 'scholar') a.add(M(new THREE.CylinderGeometry(.13, .26, .3, 10), cloth, 0, -.42, 0));
+      if (d.outfit === 'armor') { const p = M(new THREE.SphereGeometry(.17, 10, 8), toon('#c9d2dc'), 0, -.02, 0); p.scale.set(1, .6, 1); a.add(p); }
+      return a; };
     const armL = arm(-1), armR = arm(1);
     const head = new THREE.Group(); head.position.y = 1.62; torso.add(head);
     head.add(M(new THREE.SphereGeometry(.62, 20, 16), skin));
@@ -111,6 +118,12 @@ export class Avatar {
       case 'twin': for (const sd of [-1, 1]) { head.add(M(new THREE.SphereGeometry(.22, 12, 10), hairM, sd * .48, .48, -.05)); head.add(M(new THREE.SphereGeometry(.07), trim, sd * .4, .36, .12)); } break;
       case 'pony': { head.add(M(new THREE.SphereGeometry(.12), trim, 0, .5, -.5)); const p = M(new THREE.ConeGeometry(.22, 1.0, 10), hairM, 0, .1, -.78); p.rotation.x = -2.6; head.add(p); this.pony = p; break; }
       case 'long': { const l = M(new THREE.CylinderGeometry(.5, .62, 1.2, 14, 1, true, Math.PI * .5, Math.PI), hairM, 0, -.4, -.08); l.scale.set(.94, .9, .72); l.material = toon(d.hairColor, { side: THREE.DoubleSide }); head.add(l); head.add(M(new THREE.BoxGeometry(.9, .06, .06), trim, 0, .45, -.35)); break; }
+      case 'halfup': { const l = M(new THREE.CylinderGeometry(.5, .58, .85, 14, 1, true, Math.PI * .5, Math.PI), hairM, 0, -.3, -.08); l.scale.set(.94, 1, .7); l.material = toon(d.hairColor, { side: THREE.DoubleSide }); head.add(l);
+        head.add(M(new THREE.SphereGeometry(.17, 12, 10), hairM, 0, .32, -.6)); head.add(rot(M(new THREE.TorusGeometry(.13, .035, 6, 14), trim, 0, .32, -.56), 0, 0, 0)); break; }
+      case 'twintail': for (const sd of [-1, 1]) { head.add(M(new THREE.SphereGeometry(.09), trim, sd * .5, .28, -.28)); const t = M(new THREE.ConeGeometry(.17, .95, 10), hairM, sd * .66, -.22, -.32); t.rotation.set(Math.PI, 0, -sd * .22); head.add(t); } break;
+      case 'braid': { for (let i = 0; i < 6; i++) head.add(M(new THREE.SphereGeometry(.14 - i * .012, 10, 8), hairM, 0, -.32 - i * .2, -.5 - i * .02)); head.add(M(new THREE.SphereGeometry(.06), trim, 0, -1.48, -.6)); head.add(M(new THREE.ConeGeometry(.08, .2, 8), hairM, 0, -1.6, -.6)); break; }
+      case 'buyao': { head.add(M(new THREE.SphereGeometry(.24, 12, 10), hairM, 0, .66, -.18)); const gold = toon('#f2c14e'); head.add(rot(M(new THREE.CylinderGeometry(.02, .02, .7), gold, .05, .72, -.18), 0, 0, 1.2));
+        for (let i = 0; i < 3; i++) { head.add(M(new THREE.CylinderGeometry(.006, .006, .22), gold, .36 + i * .05, .5, -.18)); head.add(M(new THREE.SphereGeometry(.035), trim, .36 + i * .05, .38, -.18)); } break; }
       case 'short': for (let i = -2; i <= 2; i++) { const s = M(new THREE.ConeGeometry(.12, .3, 6), hairM, i * .2, .5, .3); s.rotation.x = .9; head.add(s); } break;
     }
     this.parts = { root, body, torso, head, armL, armR, legL, legR, hair: d.hair };

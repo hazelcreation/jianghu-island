@@ -30,6 +30,10 @@ export const db = {
     let r; try { r = await rpc('create_character', { p_name: name, p_cls: cls, p_appearance: appearance, p_message: (message || '').slice(0, 50), p_pin_hash: await this.hashPin(name, pin) }); }
     catch (e) { if (/NAME_TAKEN/.test(e.msg) || e.code === '23505') throw new Error('NAME_TAKEN'); throw e; }
     const av = toAv(r[0]); local.set('me', av.id); local.set('ph', await this.hashPin(name, pin)); if (pos) await this.updateAppearance(av.id, { pos }); return { ...av, pos }; },
+  async updateLook(name, look) { const ph = local.get('ph', null); if (!ph) throw new Error('NEED_PIN');
+    let r; try { r = await rpc('update_look', { p_name: name, p_pin_hash: ph, p_hair: look.hair, p_hair_color: look.hairColor, p_outfit: look.outfit, p_outfit_color: look.outfitColor, p_skin: look.skin }); }
+    catch (e) { if (/TOO_MANY/.test(e.msg)) throw new Error('TOO_MANY_ATTEMPTS'); if (/BANNED/.test(e.msg)) throw new Error('BANNED'); throw e; }
+    if (r == null) throw new Error('BAD_PIN'); return r; },
   hasPin() { return !!local.get('ph', null); },
   async updateMessage(name, message, pin) { const ph = pin ? await this.hashPin(name, pin) : local.get('ph', null); if (!ph) throw new Error('NEED_PIN');
     let r; try { r = await rpc('update_message', { p_name: name, p_pin_hash: ph, p_message: message.slice(0, 50) }); } catch (e) { if (/TOO_MANY/.test(e.msg)) throw new Error('TOO_MANY_ATTEMPTS'); if (/BANNED/.test(e.msg)) throw new Error('BANNED'); throw e; }

@@ -35,17 +35,18 @@
   <div class="card big creator">
     <div class="preview"><canvas id="previewCanvas" width="360" height="420"></canvas><div id="prevTag" class="tag"></div></div>
     <div class="opts">
-      <h2>捏個Q版俠客</h2>
-      <label>遊戲暱稱<input id="nameIn" maxlength="12" placeholder="輸入你的遊戲名稱"></label>
+      <h2 id="crTitle">捏個Q版俠客</h2>
+      <label class="newOnly">遊戲暱稱<input id="nameIn" maxlength="12" placeholder="輸入你的遊戲名稱"></label>
       <div class="row"><span>髮型</span><div id="hairOpts" class="chips"></div></div>
       <div class="row"><span>髮色</span><div id="hairColOpts" class="swatches"></div></div>
       <div class="row"><span>服裝</span><div id="outfitOpts" class="chips"></div></div>
       <div class="row"><span>衣色</span><div id="outfitColOpts" class="swatches"></div></div>
       <div class="row"><span>膚色</span><div id="skinOpts" class="swatches"></div></div>
-      <label>密語 <small>(4 位數字，換裝置時用「暱稱＋密語」找回角色)</small><input id="pinIn" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="例如 1206"></label>
-      <label>給大家的留言 <small>(最多50字，之後可在島上隨時修改)</small>
+      <label class="newOnly">密語 <small>(4 位數字，換裝置時用「暱稱＋密語」找回角色)</small><input id="pinIn" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="例如 1206"></label>
+      <label class="newOnly">給大家的留言 <small>(最多50字，之後可在島上隨時修改)</small>
         <textarea id="msgIn" maxlength="50" rows="2" placeholder="想對大家說的話…"></textarea><small id="msgCount" class="count">0/50</small></label>
-      <div class="btns"><button id="backBtn" class="ghost">← 換門派</button><button id="enterBtn">踏入江湖 ✦</button></div>
+      <div class="btns editOnly"><button id="lookCancel" class="ghost">取消</button><button id="lookSave">儲存換裝 ✦</button></div>
+      <div class="btns newOnly"><button id="backBtn" class="ghost">← 換門派</button><button id="enterBtn">踏入江湖 ✦</button></div>
     </div>
   </div>
 </section>
@@ -57,6 +58,7 @@
     <button id="dayBtn" class="pill">☀️ 白天</button>
     <button id="seasonBtn" class="pill">🌸 春</button>
     <button id="msgBtn" class="pill">✏️ 修改留言</button>
+    <button id="lookBtn" class="pill">👘 換裝</button>
     <button id="peopleBtn" class="pill">👥 島上俠客</button>
     <button id="adminBtn" class="pill hidden">🛡️ 管理</button>
     <button id="logBtn" class="pill">📜 江湖紀事<span id="logBadge" class="badge hidden">0</span></button>

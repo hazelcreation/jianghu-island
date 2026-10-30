@@ -156,3 +156,7 @@ button.danger{background:#c0392b;color:#fff}
 
 button[disabled]{opacity:.45;cursor:not-allowed}
 .cfm input{font:inherit;padding:8px;border:2px solid #5a3a2a;border-radius:10px;box-sizing:border-box}
+
+#creator:not(.editing) .editOnly{display:none}
+#creator.editing .newOnly{display:none}
+#creator.editing{z-index:60}
