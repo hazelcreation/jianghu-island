@@ -40,3 +40,9 @@ export const OUTFITS = [{id:'robe',n:'長袍'},{id:'short',n:'短打勁裝'},{id
 export const HAIR_COLORS = ['#2b1d16','#5a3b2e','#a0522d','#e8d8c0','#c0c0d0','#d9667a'];
 export const OUTFIT_COLORS = ['#ffffff','#f6d6de','#bfe3f5','#d8f0c8','#fbe7a1','#e7d3f7','#3a3f58','#c94a4a'];
 export const SKIN_COLORS = ['#ffe3d0','#f7d0b5','#e8b896','#c98e6b'];
+
+// 各職業頭上對話泡泡台詞（空陣列＝暫不說話）
+export const CLASS_LINES = {
+  suwen: ['彩～蝶～環～繞～', '感覺好些了嗎', '別擔心，有我在', '落花飛舞～'],
+  suimeng: [], jiuling: [], tieyi: [], xuehe: [], shenxiang: [], longyin: [], xuanji: [], chaoguang: [],
+};

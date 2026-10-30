@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { classById } from './config.js';
+import { classById, CLASS_LINES } from './config.js';
 
 const grad = (() => { const d = new Uint8Array([90, 170, 255]); const t = new THREE.DataTexture(d, 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
 export const toon = (color, extra = {}) => new THREE.MeshToonMaterial({ color, gradientMap: grad, ...extra });
@@ -21,6 +21,16 @@ export function makeTag(text, color, textColor = '#fff', opts = {}) {
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
   s.scale.set(c.width / 120, c.height / 120, 1); s.renderOrder = 10; return s;
+}
+function makeBubble(text, color) {
+  const c = document.createElement('canvas'); const g = c.getContext('2d'); const font = 'bold 40px "Noto Sans TC","Noto Serif CJK TC",sans-serif';
+  g.font = font; const w = Math.ceil(g.measureText(text).width) + 56, h = 72, tail = 20; c.width = w + 8; c.height = h + tail + 8;
+  g.fillStyle = color; rr(g, 2, 2, w + 4, h + 4, 30); g.fill(); g.beginPath(); g.moveTo(c.width / 2 - 16, h + 2); g.lineTo(c.width / 2, h + tail + 6); g.lineTo(c.width / 2 + 16, h + 2); g.fill();
+  g.fillStyle = '#fffaf3'; rr(g, 6, 6, w - 4, h - 4, 26); g.fill(); g.beginPath(); g.moveTo(c.width / 2 - 10, h); g.lineTo(c.width / 2, h + tail - 2); g.lineTo(c.width / 2 + 10, h); g.fill();
+  g.font = font; g.fillStyle = '#5a3b2e'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, c.width / 2, h / 2 + 4);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true })); s.center.set(.5, 0);
+  s.userData.base = [c.width / 105, c.height / 105]; s.renderOrder = 11; return s;
 }
 function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
@@ -115,7 +125,21 @@ export class Avatar {
   setTag(opts) { Object.assign(this, opts); const vis = this.tag.visible; this.root.remove(this.tag); this.tag.material.map.dispose(); this.tag.material.dispose();
     this.tag = makeTag(this.data.name, this.cls.color, this.cls.text || '#fff', { online: this.online, flowers: this.flowers }); this.tag.position.y = 3.35; this.tag.visible = vis; this.root.add(this.tag); }
   setState(s) { this.state = s; this.stateT = 0; }
+  // 對話泡泡：每隻角色各自隨機 20–45 秒說一句，顯示約 4 秒
+  updBubble(dt) {
+    const lines = CLASS_LINES[this.cls.id]; if (!lines?.length || !this.data.name) return;
+    if (this.bubbleIn == null) this.bubbleIn = 5 + Math.random() * 35; // 初次錯開
+    if (this.bubble) { const b = this.bubble; b.userData.t += dt; const k = b.userData.t;
+      const pop = k < .25 ? .6 + k / .25 * .4 : k > 3.7 ? Math.max(0, 1 - (k - 3.7) / .3) : 1 + Math.sin(k * 3) * .02;
+      b.scale.set(b.userData.base[0] * pop, b.userData.base[1] * pop, 1); b.material.opacity = k > 3.7 ? pop : 1;
+      if (k >= 4) { this.root.remove(b); b.material.map.dispose(); b.material.dispose(); this.bubble = null; this.bubbleIn = 20 + Math.random() * 25; } return; }
+    if ((this.bubbleIn -= dt) > 0 || !this.tag.visible) return;
+    this.say(lines[Math.floor(Math.random() * lines.length)]);
+  }
+  say(text) { if (this.bubble) { this.root.remove(this.bubble); this.bubble.material.dispose(); }
+    const b = makeBubble(text, this.cls.color); b.userData.t = 0; b.position.y = 3.75; this.root.add(b); this.bubble = b; }
   update(dt, t) {
+    this.updBubble(dt);
     const p = this.parts; this.stateT += dt; const st = this.stateT;
     // 重設姿勢
     p.body.position.y = 0; p.body.rotation.set(0, 0, 0); p.torso.rotation.set(0, 0, 0); p.head.rotation.set(0, 0, 0);
