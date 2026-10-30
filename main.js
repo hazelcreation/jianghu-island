@@ -103,10 +103,11 @@ function openWishForm() { modal(`<h2>🌸 桃溪許願池</h2><p>寫下願望，
   $('#wishIn').oninput = e => $('#wc').textContent = `${e.target.value.length}/50`;
   $('#toBoard').onclick = openWishBoard;
   $('#wishGo').onclick = async () => { const text = $('#wishIn').value.trim(); if (!text) return toast('願望不能是空的喔');
-    const anon = $('#anon').checked; await db.addWish({ text, anon, name: anon ? '' : me.name, avatarId: me.id }); await refreshBoats(); closeModal(); toast('紙船已放入池中 ⛵'); }; }
+    const anon = $('#anon').checked; try { await db.addWish({ text, anon, name: anon ? '' : me.name, avatarId: me.id }); } catch (e) { return toast(e.message === 'RATE_LIMIT' ? '許願太快了，稍等一下' : e.message === 'NEED_LOGIN' || e.message === 'NOT_ALLOWED' ? '無法許願，請重新登島' : '連線失敗，請稍後再試'); } await refreshBoats(); closeModal(); toast('紙船已放入池中 ⛵'); }; }
 async function openWishBoard() { const ws = await db.listWishes();
-  modal(`<h2>📜 願望榜</h2><p>共 ${ws.length} 個願望（池中顯示最新 20 艘紙船）</p><div class="wishlist">${ws.map(w => `<div>${esc(w.text)}<br><small>— ${w.anon ? '匿名俠客' : esc(w.name)} ・ ${fmtDate(w.created)}</small></div>`).join('')}</div><p><button id="mk">我也要許願</button></p>`); $('#mk').onclick = openWishForm; }
-function showWish(w) { modal(`<h2>⛵ 紙船上的願望</h2><div class="msgbubble">${esc(w.text)}</div><p style="text-align:right">— ${w.anon ? '匿名俠客' : esc(w.name)}</p>`); }
+  modal(`<h2>📜 願望榜</h2><p>共 ${ws.length} 個願望（池中顯示最新 20 艘紙船）</p><div class="wishlist">${ws.map(w => `<div>${isAdmin ? `<button class="adel" data-wid="${w.id}" title="刪除">🗑</button>` : ''}${esc(w.text)}<br><small>— ${w.anon ? '匿名俠客' : esc(w.name)} ・ ${fmtDate(w.created)}</small></div>`).join('')}</div><p><button id="mk">我也要許願</button></p>`); $('#mk').onclick = openWishForm;
+  bindAdminDel(openWishBoard); }
+function showWish(w) { modal(`<h2>⛵ 紙船上的願望</h2><div class="msgbubble">${esc(w.text)}</div><p style="text-align:right">— ${w.anon ? '匿名俠客' : esc(w.name)}</p>${isAdmin ? `<p><button class="danger adel" data-wid="${w.id}">🗑 刪除此願望</button></p>` : ''}`); bindAdminDel(() => closeModal()); }
 
 // ===== 三清山 =====
 function craneLoop(c) { if (c.userData.loop > 0) return; c.userData.loop = 3; const q = JIANGHU_QUOTES[Math.floor(Math.random() * JIANGHU_QUOTES.length)]; setTimeout(() => toast(`🕊️ 仙鶴傳語：${esc(q)}`, 4200), 600); }
@@ -154,13 +155,48 @@ function compress(file) { return new Promise((res, rej) => { const img = new Ima
   for (let tries = 0; tries < 12; tries++) { const k = Math.min(1, max / Math.max(w, h)); c.width = Math.round(w * k); c.height = Math.round(h * k); const g2 = c.getContext('2d'); g2.fillStyle = '#fff'; g2.fillRect(0, 0, c.width, c.height); g2.drawImage(img, 0, 0, c.width, c.height);
     url = c.toDataURL('image/jpeg', q); if (url.length * .75 <= 500 * 1024) break; if (q > .55) q -= .1; else max *= .8; }
   URL.revokeObjectURL(img.src); res(url); }; img.onerror = rej; img.src = URL.createObjectURL(file); }); }
-async function openPhotoWall() { const ps = await db.listPhotos();
-  modal(`<h2>🍁 楓林小駐・照片牆</h2><div class="form"><b>上傳回憶</b><input type="file" id="pf" accept="image/*"><input id="pt" maxlength="20" placeholder="標題（最多20字）"><textarea id="pc" maxlength="50" rows="2" placeholder="說明（最多50字，上傳後不可修改）"></textarea><small id="pcc" class="count">0/50</small><button id="pu">貼上照片牆 📌</button><small id="pst"></small></div>
-  <p>共 ${ps.length} 張</p><div class="photos">${ps.map(p => `<div class="photo"><img src="${p.img}" data-id="${p.id}" loading="lazy"><b>${esc(p.title)}</b><p>${esc(p.caption)}</p><small>📷 ${esc(p.name)} ・ ${fmtDate(p.created)}</small></div>`).join('')}</div>`, true);
+let photoTab = 'all';
+async function openPhotoWall() { const all = await db.listPhotos(); const ps = photoTab === 'hmx' ? all.filter(p => p.hmx) : all;
+  modal(`<h2>🍁 楓林小駐・照片牆</h2><div class="form"><b>上傳回憶</b><input type="file" id="pf" accept="image/*"><input id="pt" maxlength="20" placeholder="標題（最多20字）"><textarea id="pc" maxlength="50" rows="2" placeholder="說明（最多50字，上傳後不可修改）"></textarea><small id="pcc" class="count">0/50</small><label class="chk"><input type="checkbox" id="phmx"> 花沐雪結義</label><button id="pu">貼上照片牆 📌</button><small id="pst"></small></div>
+  <div class="ltabs ptabs"><button class="pill${photoTab === 'all' ? ' on' : ''}" data-pt="all">全部（${all.length}）</button><button class="pill${photoTab === 'hmx' ? ' on' : ''}" data-pt="hmx">花沐雪（${all.filter(p => p.hmx).length}）</button></div>
+  ${ps.length ? '' : '<p class="lempty">還沒有照片</p>'}<div class="photos">${ps.map(p => `<div class="photo">${p.hmx ? '<span class="hmx">花沐雪</span>' : ''}${isAdmin ? `<button class="adel" data-pid="${p.id}" title="刪除">🗑</button>` : ''}<img src="${p.img}" data-id="${p.id}" loading="lazy"><b>${esc(p.title)}</b><p>${esc(p.caption)}</p><small>📷 ${esc(p.name)} ・ ${fmtDate(p.created)}</small></div>`).join('')}</div>`, true);
   $('#pc').oninput = e => $('#pcc').textContent = `${e.target.value.length}/50`;
+  document.querySelectorAll('.ptabs button').forEach(b => b.onclick = () => { photoTab = b.dataset.pt; openPhotoWall(); });
   document.querySelectorAll('.photo img').forEach(im => im.onclick = () => window.open('').document.write(`<img src="${im.src}" style="max-width:100%">`));
-  $('#pu').onclick = async () => { const f = $('#pf').files[0], title = $('#pt').value.trim(), caption = $('#pc').value.trim(); if (!f) return toast('請先選擇照片'); if (!title) return toast('請輸入標題');
-    $('#pst').textContent = '壓縮中…'; try { const img = await compress(f); await db.addPhoto({ img, title, caption, name: me.name, avatarId: me.id }); toast(`已上傳（${Math.round(img.length * .75 / 1024)}KB）`); openPhotoWall(); } catch (e) { console.error(e); $('#pst').textContent = '上傳失敗：' + e.message; } }; }
+  bindAdminDel(openPhotoWall);
+  $('#pu').onclick = async () => { const f = $('#pf').files[0], title = $('#pt').value.trim(), caption = $('#pc').value.trim(), huamuxue = $('#phmx').checked; if (!f) return toast('請先選擇照片'); if (!title) return toast('請輸入標題');
+    $('#pst').textContent = '壓縮中…'; try { const img = await compress(f); await db.addPhoto({ img, title, caption, huamuxue, name: me.name, avatarId: me.id }); toast(`已上傳（${Math.round(img.length * .75 / 1024)}KB）`); openPhotoWall(); } catch (e) { console.error(e); $('#pst').textContent = '上傳失敗：' + (e.message === 'NOT_ALLOWED' || e.message === 'NEED_LOGIN' ? '請重新登島' : e.message); } }; }
+
+// ===== 管理員 =====
+let isAdmin = false;
+function confirmBox(text) { return new Promise(res => { const d = document.createElement('div'); d.className = 'cfm'; d.innerHTML = `<div class="mcard"><p>${text}</p><div class="row"><button class="ghost" data-v="0">取消</button><button class="danger" data-v="1">確定</button></div></div>`; document.body.appendChild(d);
+  d.querySelectorAll('button').forEach(b => b.onclick = () => { d.remove(); res(b.dataset.v === '1'); }); }); }
+function bindAdminDel(after) { if (!isAdmin) return;
+  document.querySelectorAll('.adel[data-wid]').forEach(b => b.onclick = async e => { e.stopPropagation(); if (!await confirmBox('確定刪除這個願望？此動作無法復原。')) return;
+    try { await db.adminCall('admin_delete_wish', me.name, { p_wish: b.dataset.wid }); toast('已刪除願望'); await refreshBoats(); after(); } catch (er) { toast('刪除失敗：' + er.message); } });
+  document.querySelectorAll('.adel[data-pid]').forEach(b => b.onclick = async e => { e.stopPropagation(); if (!await confirmBox('確定刪除這張照片（含檔案）？此動作無法復原。')) return;
+    try { await db.adminDeletePhoto(me.name, b.dataset.pid); toast('已刪除照片'); after(); } catch (er) { toast('刪除失敗：' + er.message); } }); }
+let adminTab = 'players';
+async function openAdmin(tab) { if (!isAdmin) return; if (typeof tab === 'string') adminTab = tab;
+  modal(`<h2>🛡️ 管理</h2><div class="ltabs"><button class="pill${adminTab === 'players' ? ' on' : ''}" data-at="players">俠客</button><button class="pill${adminTab === 'wishes' ? ' on' : ''}" data-at="wishes">願望</button><button class="pill${adminTab === 'photos' ? ' on' : ''}" data-at="photos">照片</button></div><div class="llist" id="alist"><div class="lempty">載入中…</div></div>`, true);
+  document.querySelectorAll('[data-at]').forEach(b => b.onclick = () => { adminTab = b.dataset.at; openAdmin(); });
+  const L = $('#alist');
+  try {
+    if (adminTab === 'players') { const ps = await db.adminCall('admin_list_players', me.name);
+      L.innerHTML = ps.map(p => `<div class="litem arow"><div><b>${esc(p.name)}</b>${p.is_admin ? ' 🛡️' : ''}${p.banned ? ' <span class="hmx ban">已封禁</span>' : ''}<br><small>${esc(p.message || '（無留言）')}</small></div><div class="abtns">${p.is_admin ? '' : `<button class="${p.banned ? 'ghost' : 'danger'}" data-ban="${p.id}" data-b="${p.banned ? 0 : 1}" data-n="${esc(p.name)}">${p.banned ? '解封' : '封禁'}</button>`}${p.message ? `<button class="ghost" data-clr="${p.id}" data-n="${esc(p.name)}">清除留言</button>` : ''}</div></div>`).join('') || '<div class="lempty">沒有俠客</div>';
+      L.querySelectorAll('[data-ban]').forEach(b => b.onclick = async () => { const ban = b.dataset.b === '1'; if (!await confirmBox(`確定${ban ? '封禁' : '解封'}「${b.dataset.n}」？`)) return;
+        try { await db.adminCall('admin_set_banned', me.name, { p_target: b.dataset.ban, p_banned: ban }); toast(ban ? '已封禁' : '已解封'); if (ban) removeAvatar(b.dataset.ban); else syncOthers(); openAdmin(); } catch (er) { toast('失敗：' + er.message); } });
+      L.querySelectorAll('[data-clr]').forEach(b => b.onclick = async () => { if (!await confirmBox(`確定清除「${b.dataset.n}」的留言？`)) return;
+        try { await db.adminCall('admin_clear_message', me.name, { p_target: b.dataset.clr }); const a = byId(b.dataset.clr); if (a) a.data.message = '（留言已被管理員清除）'; toast('已清除留言'); openAdmin(); } catch (er) { toast('失敗：' + er.message); } });
+    } else if (adminTab === 'wishes') { const ws = await db.listWishes();
+      L.innerHTML = ws.map(w => `<div class="litem arow"><div>${esc(w.text)}<br><small>— ${w.anon ? '匿名' : esc(w.name)} ・ ${fmtDate(w.created)}</small></div><div class="abtns"><button class="danger adel" data-wid="${w.id}">刪除</button></div></div>`).join('') || '<div class="lempty">沒有願望</div>'; bindAdminDel(openAdmin);
+    } else { const ps = await db.listPhotos();
+      L.innerHTML = ps.map(p => `<div class="litem arow"><img class="athumb" src="${p.img}" loading="lazy"><div style="flex:1">${p.hmx ? '<span class="hmx">花沐雪</span> ' : ''}<b>${esc(p.title)}</b><br><small>📷 ${esc(p.name)} ・ ${fmtDate(p.created)}</small></div><div class="abtns"><button class="danger adel" data-pid="${p.id}">刪除</button></div></div>`).join('') || '<div class="lempty">沒有照片</div>'; bindAdminDel(openAdmin); }
+  } catch (er) { L.innerHTML = `<div class="lempty">載入失敗：${esc(er.message)}</div>`; } }
+function removeAvatar(id) { const i = avatars.findIndex(a => a.data?.id === id && !a.isMe); if (i < 0) return; scene.remove(avatars[i].root); avatars.splice(i, 1); }
+async function checkAdmin() { isAdmin = await db.isAdmin(me.name); $('#adminBtn').classList.toggle('hidden', !isAdmin); }
+$('#adminBtn').onclick = () => openAdmin('players');
+function kickBanned() { localStorage.removeItem('nsh_island_v2_me'); localStorage.removeItem('nsh_island_v2_ph'); alert('此角色已被管理員封禁，無法進入小島。'); location.reload(); }
 
 // ===== 互動：點擊 / 移動 =====
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -268,7 +304,7 @@ async function startWorld() { for (const a of await db.listAvatars()) { if (a.id
   player = spawn(me, true); player.speed = 8;
   marker = new THREE.Mesh(new THREE.RingGeometry(.5, .75, 24), new THREE.MeshBasicMaterial({ color: '#ffd84a', transparent: true, opacity: .8, side: THREE.DoubleSide })); marker.rotation.x = -Math.PI / 2; marker.visible = false; scene.add(marker);
   const p = player.root.position; controls.target.set(p.x, 1.5, p.z); camera.position.set(p.x + 10, 16, p.z + 24);
-  $('#hud').classList.remove('hidden'); await refreshBoats(); toast(`歡迎 ${esc(me.name)} 踏入江湖！點地面移動 ✦`);
+  $('#hud').classList.remove('hidden'); checkAdmin(); await refreshBoats(); toast(`歡迎 ${esc(me.name)} 踏入江湖！點地面移動 ✦`);
   await refreshFlowers(); startRealtime(); showInbox(); }
 const byId = id => avatars.find(a => a.data?.id === id);
 async function refreshFlowers() { try { const fc = await db.flowerCounts(); for (const a of avatars) { const n = fc[a.data.id] || 0; if (n !== (a.flowers || 0)) a.setTag({ flowers: n }); } } catch (e) { console.warn('flowers', e); } }
@@ -307,7 +343,7 @@ $('#newBtn').onclick = () => showPanel('pickCls'); $('#loginBtn').onclick = () =
 document.querySelectorAll('.toChoose').forEach(b => b.onclick = () => showPanel('choose'));
 $('#rGo').onclick = async () => { const name = $('#rName').value.trim(), pin = $('#rPin').value.trim();
   if (!name || !/^\d{4}$/.test(pin)) return toast('請輸入遊戲名稱與 4 位數密語');
-  let a; try { a = await db.recover(name, pin); } catch (e) { return toast(e.message === 'TOO_MANY_ATTEMPTS' ? '嘗試太多次了，請 10 分鐘後再試' : '連線失敗，請稍後再試'); }
+  let a; try { a = await db.recover(name, pin); } catch (e) { return toast(e.message === 'TOO_MANY_ATTEMPTS' ? '嘗試太多次了，請 10 分鐘後再試' : e.message === 'BANNED' ? '此角色已被封禁' : '連線失敗，請稍後再試'); }
   if (!a) return toast('遊戲名稱或密語不正確');
   me = a; $('#entry').classList.add('hidden'); startWorld(); };
 $('#rPin').onkeydown = e => { if (e.key === 'Enter') $('#rGo').click(); };
@@ -320,12 +356,12 @@ $('#msgBtn').onclick = () => { if (!me) return; const need = !db.hasPin();
     try { me.message = await db.updateMessage(me.name, msg, pin); if (player) player.data.message = me.message; closeModal(); toast('留言已更新 ✦'); }
     catch (e) { toast(e.message === 'BAD_PIN' ? '密語不正確' + (need ? '' : '，請重新輸入') : e.message === 'TOO_MANY_ATTEMPTS' ? '嘗試太多次了，請 10 分鐘後再試' : '連線失敗，請稍後再試'); if (e.message === 'BAD_PIN' && !need) $('#msgBtn').click(); } }; };
 // 每 15 秒同步其他俠客與紙船
-async function syncOthers() { if (!me) return; try { const list = await db.listAvatars(); const known = new Set(avatars.map(a => a.data?.id));
+async function syncOthers() { if (!me) return; try { const list = await db.listAvatars(); if (!list.some(a => a.id === me.id)) return kickBanned(); for (const a of [...avatars]) if (!a.isMe && a.data?.id && !list.some(x => x.id === a.data.id)) removeAvatar(a.data.id); const known = new Set(avatars.map(a => a.data?.id));
   for (const a of list) { if (a.id === me.id) continue; if (!known.has(a.id)) { known.add(a.id); spawn(a); } else { const av = avatars.find(x => x.data?.id === a.id); if (av) av.data.message = a.message; } }
   if (world.boatGroup.children.length !== (await db.listWishes()).slice(0, 20).length) await refreshBoats(); await refreshFlowers(); } catch (e) { console.warn('sync', e); } }
 setInterval(syncOthers, 15000);
 applySeason(); updDayBtn(); buildEntry(); loop();
 // 開場：慢慢環繞全景
 controls.autoRotate = false;
-me = await db.getMe(); if (me) { $('#entry').classList.add('hidden'); startWorld(); }
-window.__nsh = { faceMotion, ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };
+me = await db.getMe(); if (me?.banned) { me = null; kickBanned(); } if (me) { $('#entry').classList.add('hidden'); startWorld(); }
+window.__nsh = { openAdmin, openPhotoWall, get isAdmin() { return isAdmin; }, faceMotion, ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };

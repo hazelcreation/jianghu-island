@@ -118,3 +118,22 @@ input,textarea{max-width:100%;min-width:0}
   .travel{max-width:calc(100vw - 12px);flex-wrap:wrap;justify-content:center}
   .emotes{bottom:96px}.emotes button{width:46px;height:46px;font-size:18px}
 }
+
+/* 照片牆分頁 / 花沐雪 / 管理 */
+.pill.on{background:#c8553d;color:#fff}
+.chk{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}.chk input{width:auto;margin:0}
+.photo{position:relative}
+.hmx{display:inline-block;background:linear-gradient(135deg,#e88aa8,#b56ad8);color:#fff;font-size:11px;padding:1px 7px;border-radius:9px;font-weight:bold}
+.photo .hmx{position:absolute;top:6px;left:6px;z-index:1;box-shadow:0 1px 3px #0005}
+.hmx.ban{background:#777}
+.adel{position:absolute;top:4px;right:4px;z-index:2;padding:2px 6px;font-size:13px;background:#fffc;border:1px solid #c33;border-radius:6px;cursor:pointer;line-height:1.2}
+.wishlist>div{position:relative;padding-right:34px}
+.abtns .adel,.msgbubble~p .adel{position:static}
+button.danger{background:#c0392b;color:#fff}
+.arow{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.abtns{display:flex;gap:6px;flex-shrink:0}.abtns button{padding:4px 10px;font-size:13px}
+.athumb{width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0}
+.cfm{position:fixed;inset:0;background:#0007;z-index:9999;display:flex;align-items:center;justify-content:center}
+.cfm .mcard{max-width:320px;width:86%;padding:18px;text-align:center}.cfm .row{display:flex;gap:10px;justify-content:center;margin-top:12px}
+@media (max-width:480px){.arow{flex-wrap:wrap}.abtns{width:100%;justify-content:flex-end}.ptabs .pill{flex:1}}
+.form label.chk{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:6px;align-self:flex-start}.form label.chk input{flex:none;width:18px;height:18px}
