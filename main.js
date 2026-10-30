@@ -162,10 +162,21 @@ async function openPhotoWall() { const all = await db.listPhotos(); const ps = p
   ${ps.length ? '' : '<p class="lempty">還沒有照片</p>'}<div class="photos">${ps.map(p => `<div class="photo">${p.hmx ? '<span class="hmx">花沐雪</span>' : ''}${isAdmin ? `<button class="adel" data-pid="${p.id}" title="刪除">🗑</button>` : ''}<img src="${p.img}" data-id="${p.id}" loading="lazy"><b>${esc(p.title)}</b><p>${esc(p.caption)}</p><small>📷 ${esc(p.name)} ・ ${fmtDate(p.created)}</small></div>`).join('')}</div>`, true);
   $('#pc').oninput = e => $('#pcc').textContent = `${e.target.value.length}/50`;
   document.querySelectorAll('.ptabs button').forEach(b => b.onclick = () => { photoTab = b.dataset.pt; openPhotoWall(); });
-  document.querySelectorAll('.photo img').forEach(im => im.onclick = () => window.open('').document.write(`<img src="${im.src}" style="max-width:100%">`));
+  document.querySelectorAll('.photo img').forEach((im, i) => im.onclick = () => openLightbox(ps, i));
   bindAdminDel(openPhotoWall);
   $('#pu').onclick = async () => { const f = $('#pf').files[0], title = $('#pt').value.trim(), caption = $('#pc').value.trim(), huamuxue = $('#phmx').checked; if (!f) return toast('請先選擇照片'); if (!title) return toast('請輸入標題');
     $('#pst').textContent = '壓縮中…'; try { const img = await compress(f); await db.addPhoto({ img, title, caption, huamuxue, name: me.name, avatarId: me.id }); toast(`已上傳（${Math.round(img.length * .75 / 1024)}KB）`); openPhotoWall(); } catch (e) { console.error(e); $('#pst').textContent = '上傳失敗：' + (e.message === 'NOT_ALLOWED' || e.message === 'NEED_LOGIN' ? '請重新登島' : e.message); } }; }
+
+// 燈箱
+function openLightbox(list, idx) { document.querySelector('.lbx')?.remove(); const d = document.createElement('div'); d.className = 'lbx'; document.body.appendChild(d);
+  const show = () => { const p = list[idx]; d.innerHTML = `<button class="lbx-x" aria-label="關閉">×</button>${list.length > 1 ? '<button class="lbx-nav lbx-p" aria-label="上一張">‹</button><button class="lbx-nav lbx-n" aria-label="下一張">›</button>' : ''}<figure><img src="${p.img}" alt=""><figcaption>${p.hmx ? '<span class="hmx">花沐雪</span> ' : ''}<b>${esc(p.title)}</b>${p.caption ? `<p>${esc(p.caption)}</p>` : ''}<small>📷 ${esc(p.name)} ・ ${fmtDate(p.created)}　${idx + 1}/${list.length}</small></figcaption></figure>`;
+    d.querySelector('.lbx-x').onclick = close; d.querySelector('.lbx-p')?.addEventListener('click', e => { e.stopPropagation(); go(-1); }); d.querySelector('.lbx-n')?.addEventListener('click', e => { e.stopPropagation(); go(1); }); };
+  const go = k => { idx = (idx + k + list.length) % list.length; show(); };
+  const key = e => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'ArrowRight') go(1); };
+  function close() { d.remove(); removeEventListener('keydown', key, true); }
+  d.onclick = e => { if (e.target === d || e.target.tagName === 'FIGURE') close(); };
+  let sx = null; d.addEventListener('touchstart', e => sx = e.touches[0].clientX, { passive: true }); d.addEventListener('touchend', e => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 40 && list.length > 1) go(dx < 0 ? 1 : -1); });
+  addEventListener('keydown', key, true); show(); }
 
 // ===== 管理員 =====
 let isAdmin = false;
@@ -364,4 +375,4 @@ applySeason(); updDayBtn(); buildEntry(); loop();
 // 開場：慢慢環繞全景
 controls.autoRotate = false;
 me = await db.getMe(); if (me?.banned) { me = null; kickBanned(); } if (me) { $('#entry').classList.add('hidden'); startWorld(); }
-window.__nsh = { openAdmin, openPhotoWall, get isAdmin() { return isAdmin; }, faceMotion, ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };
+window.__nsh = { openLightbox, openAdmin, openPhotoWall, get isAdmin() { return isAdmin; }, faceMotion, ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };
