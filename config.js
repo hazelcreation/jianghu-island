@@ -44,5 +44,5 @@ export const SKIN_COLORS = ['#ffe3d0','#f7d0b5','#e8b896','#c98e6b'];
 // 各職業頭上對話泡泡台詞（空陣列＝暫不說話）
 export const CLASS_LINES = {
   suwen: ['彩～蝶～環～繞～', '感覺好些了嗎', '別擔心，有我在', '落花飛舞～'],
-  suimeng: [], jiuling: ['魂兮歸來', '以身飼蠱', '今日為君舞一曲', '碧落九天'], tieyi: [], xuehe: [], shenxiang: [], longyin: [], xuanji: [], chaoguang: [],
+  suimeng: [], jiuling: ['魂兮歸來', '以身飼蠱', '今日為君舞一曲', '碧落九天'], tieyi: [], xuehe: [], shenxiang: ['落雁無情', '聽，琴弦刀刃的聲音', '起風了', '此曲甚妙'], longyin: [], xuanji: [], chaoguang: [],
 };
