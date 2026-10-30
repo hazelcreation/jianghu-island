@@ -185,7 +185,7 @@ function interact(a, type) { const tp = a.root.position; let dir = player.root.p
   if (type === 'meditate') dir = new THREE.Vector3(dir.z, 0, -dir.x); dir.setLength(type === 'meditate' ? 1.7 : 1.5); let spot = tp.clone().add(dir);
   if (!walkable(spot.x, spot.z)) spot = tp.clone().add(dir.negate()); setTarget(spot); pendingAttack = false; pendingAct = { a, type }; }
 async function doAct({ a, type }) { const p = player.root.position; playAct(player, a, type); rt?.bcast('act', { from: me.id, to: a.data.id, type, x: p.x, z: p.z });
-  try { await db.sendInteraction(me.id, a.data.id, type); } catch (e) { toast(e.message === 'RATE_LIMIT' ? '動作太頻繁了，休息一下吧～' : '連線失敗，互動未記錄'); } }
+  try { const ok = await db.sendInteraction(me.id, a.data.id, type); if (ok !== false) logAdd('out', a.data.name, type); } catch (e) { toast(e.message === 'RATE_LIMIT' ? '動作太頻繁了，休息一下吧～' : '連線失敗，互動未記錄'); } }
 function floatText(target, txt, color, n = 1) { for (let i = 0; i < n; i++) setTimeout(() => { const s = makeTag(txt, color); s.scale.multiplyScalar(.7); s.position.copy(target.root.position).add(new THREE.Vector3((Math.random() - .5) * 1.4, 3.1 + Math.random() * .5, (Math.random() - .5) * 1.4)); s.userData.life = 0; scene.add(s); floaters.push(s); }, i * 220); }
 function playAct(src, dst, type) { const face = (x, y) => x.root.lookAt(y.root.position.x, x.root.position.y, y.root.position.z); face(src, dst); src.target = null;
   switch (type) {
@@ -196,7 +196,7 @@ function playAct(src, dst, type) { const face = (x, y) => x.root.lookAt(y.root.p
     case 'meditate': face(dst, src); src.setState('meditate'); dst.target = null; dst.setState('meditate'); break;
     case 'spar': face(dst, src); dst.target = null; src.sparOff = 0; dst.sparOff = .5; src.setState('spar'); dst.setState('spar'); floatText(dst, '★', '#ffd84a', 4); floatText(src, '★', '#ffd84a', 4); break;
   }
-  if (dst.isMe) { toast(`<b>${esc(src.data.name)}</b> ${ACT_MSG[type]}`, 3500); setTimeout(() => db.fetchInbox(me.id).catch(() => {}), 2500); } }
+  if (dst.isMe) { toast(`<b>${esc(src.data.name)}</b> ${ACT_MSG[type]}`, 3500); logAdd('in', src.data.name, type); } }
 const keys = {}; addEventListener('keydown', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; keys[e.key.toLowerCase()] = true; });
 addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 document.querySelectorAll('[data-emote]').forEach(b => b.onclick = () => { if (!player) return; const s = b.dataset.emote; player.target = null; if (s === 'attack') return hitDummy(); player.setState(player.state === s && (s === 'sit' || s === 'meditate') ? 'idle' : s); rt?.bcast('emote', { id: me.id, s: player.state, x: player.root.position.x, z: player.root.position.z }); });
@@ -270,8 +270,23 @@ async function startWorld() { for (const a of await db.listAvatars()) { if (a.id
   await refreshFlowers(); startRealtime(); showInbox(); }
 const byId = id => avatars.find(a => a.data?.id === id);
 async function refreshFlowers() { try { const fc = await db.flowerCounts(); for (const a of avatars) { const n = fc[a.data.id] || 0; if (n !== (a.flowers || 0)) a.setTag({ flowers: n }); } } catch (e) { console.warn('flowers', e); } }
-async function showInbox() { let ib; try { ib = await db.fetchInbox(me.id); } catch { return; } if (!ib.length) return;
-  const lines = ib.slice(-8).map(x => `<b>${esc(x.from_name)}</b> ${ACT_MSG[x.type] || x.type}`); setTimeout(() => toast(`📬 你不在時：<br>${lines.join('<br>')}${ib.length > 8 ? `<br>…等共 ${ib.length} 則` : ''}`, 7000), 2800); }
+const ACT_OUT = { bow: n => `你向 <b>${n}</b> 抱拳`, flower: n => `你送 <b>${n}</b> 一朵花 🌸`, pat: n => `你拍拍 <b>${n}</b> 的頭`, punch: n => `你打了 <b>${n}</b> 一拳 👊`, meditate: n => `你陪 <b>${n}</b> 一起打坐`, spar: n => `你找 <b>${n}</b> 比武 ⚔️` };
+let ilog = [], logTab = 'in';
+function relTime(ts) { const s = Math.max(0, (Date.now() - new Date(ts)) / 1000); if (s < 60) return '剛剛'; if (s < 3600) return `${Math.floor(s / 60)} 分鐘前`; if (s < 86400) return `${Math.floor(s / 3600)} 小時前`; if (s < 86400 * 30) return `${Math.floor(s / 86400)} 天前`; return new Date(ts).toLocaleDateString('zh-TW'); }
+function updBadge() { const n = ilog.filter(x => x.dir === 'in' && !x.seen).length, b = $('#logBadge'); b.textContent = n > 99 ? '99+' : n; b.classList.toggle('hidden', !n); }
+async function loadLog() { try { ilog = await db.interactionLog(me.id); } catch { } updBadge(); return ilog; }
+function renderLog() { const rows = ilog.filter(x => x.dir === logTab);
+  $('#llist').innerHTML = rows.length ? rows.map(x => { const n = esc(x.other_name || '（已離島）'); return `<div class="litem${x.dir === 'in' && !x.seen ? ' new' : ''}"><span class="lt">${x.dir === 'in' ? `<b>${n}</b> ${ACT_MSG[x.type] || x.type}` : (ACT_OUT[x.type] || (n => n))(n)}</span><span class="tm" title="${new Date(x.created_at).toLocaleString('zh-TW')}">${relTime(x.created_at)}</span></div>`; }).join('') : `<div class="lempty">${logTab === 'in' ? '還沒有人跟你互動，去島上走走吧～' : '你還沒跟別人互動過，點其他俠客試試看！'}</div>`;
+  document.querySelectorAll('.ltabs button').forEach(b => b.classList.toggle('on', b.dataset.t === logTab)); }
+async function openLog() { if (!me) return; if (!db.hasPin()) { toast('請重新登島（再次登島）後才能查看紀事'); return; }
+  modal(`<h2>📜 江湖紀事</h2><div class="ltabs"><button class="pill" data-t="in">別人對我</button><button class="pill" data-t="out">我對別人</button></div><div class="llist" id="llist"><div class="lempty">載入中…</div></div>`);
+  document.querySelectorAll('.ltabs button').forEach(b => b.onclick = () => { logTab = b.dataset.t; renderLog(); });
+  await loadLog(); renderLog();
+  if (ilog.some(x => x.dir === 'in' && !x.seen)) { db.markSeen(me.id).then(() => { ilog.forEach(x => { if (x.dir === 'in') x.seen = true; }); updBadge(); }).catch(() => {}); } }
+$('#logBtn').onclick = openLog;
+function logAdd(dir, otherName, type) { ilog.unshift({ id: 'live' + Date.now(), dir, other_name: otherName, type, created_at: new Date().toISOString(), seen: dir === 'out' }); updBadge(); if (!$('#modal').classList.contains('hidden') && $('#llist')) renderLog(); }
+async function showInbox() { await loadLog(); const ib = ilog.filter(x => x.dir === 'in' && !x.seen); if (!ib.length) return;
+  const lines = ib.slice(0, 8).map(x => `<b>${esc(x.other_name)}</b> ${ACT_MSG[x.type] || x.type}`); setTimeout(() => toast(`📬 你不在時：<br>${lines.join('<br>')}${ib.length > 8 ? `<br>…等共 ${ib.length} 則` : ''}<br><small>點「📜 江湖紀事」看全部</small>`, 7000), 2800); }
 let rt = null;
 function startRealtime() { rt = connectRealtime(me, {
   presence: ids => { for (const a of avatars) { if (a.isMe) continue; const on = ids.has(a.data.id); if (on !== !!a.online) { a.setTag({ online: on }); if (!on) a.home.copy(a.root.position); } } if ([...ids].some(id => !byId(id))) syncOthers(); },
@@ -310,4 +325,4 @@ applySeason(); updDayBtn(); buildEntry(); loop();
 // 開場：慢慢環繞全景
 controls.autoRotate = false;
 me = await db.getMe(); if (me) { $('#entry').classList.add('hidden'); startWorld(); }
-window.__nsh = { K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };
+window.__nsh = { ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };

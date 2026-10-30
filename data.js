@@ -37,6 +37,8 @@ export const db = {
   async sendInteraction(from, to, type) { const ph = local.get('ph', null); if (!ph) return false;
     try { return await rpc('send_interaction', { p_from: from, p_pin_hash: ph, p_to: to, p_type: type }); } catch (e) { if (/RATE_LIMIT/.test(e.msg)) throw new Error('RATE_LIMIT'); throw e; } },
   async fetchInbox(id) { const ph = local.get('ph', null); if (!ph) return []; return (await rpc('fetch_inbox', { p_id: id, p_pin_hash: ph })) || []; },
+  async interactionLog(id) { const ph = local.get('ph', null); if (!ph) return []; return (await rpc('interaction_log', { p_id: id, p_pin_hash: ph })) || []; },
+  async markSeen(id) { const ph = local.get('ph', null); if (!ph) return 0; return await rpc('mark_interactions_seen', { p_id: id, p_pin_hash: ph }); },
   async flowerCounts() { return Object.fromEntries((await rpc('flower_counts', {})).map(r => [r.to_id, +r.n])); },
   async updateAppearance(id, patch) { if (patch.pos) { const p = local.get('pos', {}); p[id] = patch.pos; local.set('pos', p); } return null; },
   async listAvatars() { return (await api(`characters?select=${CHAR_COLS}&order=created_at.asc&limit=500`)).map(toAv); },
