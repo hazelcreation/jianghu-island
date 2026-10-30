@@ -34,6 +34,10 @@ export const db = {
   async updateMessage(name, message, pin) { const ph = pin ? await this.hashPin(name, pin) : local.get('ph', null); if (!ph) throw new Error('NEED_PIN');
     let r; try { r = await rpc('update_message', { p_name: name, p_pin_hash: ph, p_message: message.slice(0, 50) }); } catch (e) { if (/TOO_MANY/.test(e.msg)) throw new Error('TOO_MANY_ATTEMPTS'); throw e; }
     if (r == null) { local.set('ph', null); throw new Error('BAD_PIN'); } local.set('ph', ph); return r; },
+  async sendInteraction(from, to, type) { const ph = local.get('ph', null); if (!ph) return false;
+    try { return await rpc('send_interaction', { p_from: from, p_pin_hash: ph, p_to: to, p_type: type }); } catch (e) { if (/RATE_LIMIT/.test(e.msg)) throw new Error('RATE_LIMIT'); throw e; } },
+  async fetchInbox(id) { const ph = local.get('ph', null); if (!ph) return []; return (await rpc('fetch_inbox', { p_id: id, p_pin_hash: ph })) || []; },
+  async flowerCounts() { return Object.fromEntries((await rpc('flower_counts', {})).map(r => [r.to_id, +r.n])); },
   async updateAppearance(id, patch) { if (patch.pos) { const p = local.get('pos', {}); p[id] = patch.pos; local.set('pos', p); } return null; },
   async listAvatars() { return (await api(`characters?select=${CHAR_COLS}&order=created_at.asc&limit=500`)).map(toAv); },
   async recordDraw(id, result) { const r = await rpc('record_draw', { p_character_id: id, p_result: result }); return r[0]; },

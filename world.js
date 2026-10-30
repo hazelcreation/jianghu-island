@@ -330,7 +330,7 @@ function decorate(scene, lanterns) {
     for (const f of D.floats) { const u = f.userData; f.position.set(u.x + Math.sin(t * .2 + u.ph) * 1.2, -3.9 + Math.sin(t * 1.2 + u.ph) * .05, u.z + Math.cos(t * .17 + u.ph) * 1.2); }
     for (const f of D.fish) { const u = f.userData, k = ((t * .35 + u.ph) % 4); if (k < 1) { f.visible = true; f.position.set(u.x + Math.cos(u.ry) * (k * 2.4 - 1.2), -4 + Math.sin(k * Math.PI) * 1.6, u.z + Math.sin(u.ry) * (k * 2.4 - 1.2)); f.rotation.set(-Math.cos(k * Math.PI) * .9, -u.ry + Math.PI / 2, 0); } else f.visible = false; }
     for (const g of D.birds) { const u = g.userData, a = u.ph + t * u.sp; g.position.set(u.cx + Math.cos(a) * u.r, u.h + Math.sin(t * 2 + u.ph) * .4, u.cz + Math.sin(a) * u.r); g.rotation.y = -a + (u.sp > 0 ? Math.PI : 0); u.w.forEach((w, i) => w.rotation.z = (i ? -1 : 1) * Math.sin(t * 12 + u.ph) * .7); }
-    for (const r of D.rabbits) { const u = r.userData, a = u.a + t * .06 * (u.ph > 3 ? 1 : -1); r.position.set(u.I.x + Math.cos(a) * u.rr, Math.abs(Math.sin(t * 4 + u.ph)) * .25, u.I.z + Math.sin(a) * u.rr); r.rotation.y = -a + (u.ph > 3 ? Math.PI : 0); }
+    for (const r of D.rabbits) { const u = r.userData, a = u.a + t * .06 * (u.ph > 3 ? 1 : -1); r.position.set(u.I.x + Math.cos(a) * u.rr, Math.abs(Math.sin(t * 4 + u.ph)) * .25, u.I.z + Math.sin(a) * u.rr); r.rotation.y = -a + (u.ph > 3 ? 0 : Math.PI); }
   };
   return D;
 }

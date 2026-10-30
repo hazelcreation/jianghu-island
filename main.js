@@ -5,6 +5,7 @@ import { db } from './data.js';
 import { Avatar, makeTag } from './avatar.js';
 import { buildWorld, ISLANDS, walkable, heightAt, islandAt, mats, paperBoat } from './world.js';
 import { ICONS } from './icons.js';
+import { connectRealtime } from './rt.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -171,32 +172,53 @@ function click(cx, cy) { ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 
   const hit = ray.intersectObjects(objs, true)[0];
   if (hit) { let o = hit.object; if (o.userData.avatar) return showAvatar(o.userData.avatar); if (o.userData.wish) return showWish(o.userData.wish);
     while (o) { const c = world.clickables.find(c => c.obj === o); if (c) return c.fn(); o = o.parent; } }
-  const p = new THREE.Vector3(); if (ray.ray.intersectPlane(ground, p) && walkable(p.x, p.z)) { setTarget(p); pendingAttack = false; } }
+  const p = new THREE.Vector3(); if (ray.ray.intersectPlane(ground, p) && walkable(p.x, p.z)) { setTarget(p); pendingAttack = false; pendingAct = null; } }
 function setTarget(p) { player.target = p.clone(); player.setState('idle'); marker.position.set(p.x, heightAt(p.x, p.z) + .05, p.z); marker.visible = true; }
-function showAvatar(a) { const c = a.cls, d = a.data; modal(`<h2><span class="tag" style="background:${c.color};color:${c.text || '#fff'}">${esc(d.name)}</span></h2><p>門派：${c.name} ・ 武器：${c.weapon}${d.sample ? ' ・ <small>範例角色</small>' : ''}</p><div class="msgbubble">💬 ${esc(d.message || '（這位俠客沒有留言）')}</div><small>留言於 ${fmtDate(d.created)}</small>`);
-  a.root.lookAt(player.root.position.x, a.root.position.y, player.root.position.z); a.setState('wave'); }
+const ACTS = [['bow', '🙏 抱拳'], ['flower', '🌸 送花'], ['pat', '✋ 拍拍頭'], ['punch', '👊 打一拳'], ['meditate', '🧘 一起打坐'], ['spar', '⚔️ 比武']];
+const ACT_MSG = { bow: '向你抱拳', flower: '送你一朵花 🌸', pat: '拍拍你的頭', punch: '打了你一拳 👊', meditate: '陪你一起打坐', spar: '找你比武 ⚔️' };
+function showAvatar(a) { const c = a.cls, d = a.data; modal(`<h2><span class="tag" style="background:${c.color};color:${c.text || '#fff'}">${esc(d.name)}</span> ${a.online ? '<small style="color:#2fae55">● 在線</small>' : '<small style="color:#999">○ 離線</small>'}</h2><p>門派：${c.name} ・ 武器：${c.weapon}${a.flowers ? ` ・ 🌸 ${a.flowers}` : ''}</p><div class="msgbubble">💬 ${esc(d.message || '（這位俠客沒有留言）')}</div><small>留言於 ${fmtDate(d.created)}</small>
+  <div class="actmenu" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">${ACTS.map(([k, n]) => `<button data-act="${k}">${n}</button>`).join('')}</div>`);
+  document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { closeModal(); interact(a, b.dataset.act); });
+  if (!a.online) { a.root.lookAt(player.root.position.x, a.root.position.y, player.root.position.z); a.setState('wave'); } }
+let pendingAct = null;
+function interact(a, type) { const tp = a.root.position; let dir = player.root.position.clone().sub(tp).setY(0); if (dir.length() < .1) dir.set(0, 0, 1);
+  if (type === 'meditate') dir = new THREE.Vector3(dir.z, 0, -dir.x); dir.setLength(type === 'meditate' ? 1.7 : 1.5); let spot = tp.clone().add(dir);
+  if (!walkable(spot.x, spot.z)) spot = tp.clone().add(dir.negate()); setTarget(spot); pendingAttack = false; pendingAct = { a, type }; }
+async function doAct({ a, type }) { const p = player.root.position; playAct(player, a, type); rt?.bcast('act', { from: me.id, to: a.data.id, type, x: p.x, z: p.z });
+  try { await db.sendInteraction(me.id, a.data.id, type); } catch (e) { toast(e.message === 'RATE_LIMIT' ? '動作太頻繁了，休息一下吧～' : '連線失敗，互動未記錄'); } }
+function floatText(target, txt, color, n = 1) { for (let i = 0; i < n; i++) setTimeout(() => { const s = makeTag(txt, color); s.scale.multiplyScalar(.7); s.position.copy(target.root.position).add(new THREE.Vector3((Math.random() - .5) * 1.4, 3.1 + Math.random() * .5, (Math.random() - .5) * 1.4)); s.userData.life = 0; scene.add(s); floaters.push(s); }, i * 220); }
+function playAct(src, dst, type) { const face = (x, y) => x.root.lookAt(y.root.position.x, x.root.position.y, y.root.position.z); face(src, dst); src.target = null;
+  switch (type) {
+    case 'bow': src.setState('bow'); if (dst.state !== 'sit' && dst.state !== 'meditate' && !dst.isMe) { face(dst, src); dst.setState('bow'); } break;
+    case 'flower': src.setState('wave'); floatText(dst, '✿', '#ff7fa8', 4); dst.setTag({ flowers: (dst.flowers || 0) + 1 }); break;
+    case 'pat': src.setState('pat'); floatText(dst, '♥', '#ff6b8a', 3); break;
+    case 'punch': src.setState('attack'); setTimeout(() => { dst.setState('hit'); floatText(dst, '★', '#ffd84a', 5); }, 350); setTimeout(() => src.state === 'attack' && src.setState('idle'), 700); break;
+    case 'meditate': face(dst, src); src.setState('meditate'); dst.target = null; dst.setState('meditate'); break;
+    case 'spar': face(dst, src); dst.target = null; src.sparOff = 0; dst.sparOff = .5; src.setState('spar'); dst.setState('spar'); floatText(dst, '★', '#ffd84a', 4); floatText(src, '★', '#ffd84a', 4); break;
+  }
+  if (dst.isMe) { toast(`<b>${esc(src.data.name)}</b> ${ACT_MSG[type]}`, 3500); setTimeout(() => db.fetchInbox(me.id).catch(() => {}), 2500); } }
 const keys = {}; addEventListener('keydown', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; keys[e.key.toLowerCase()] = true; });
 addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-document.querySelectorAll('[data-emote]').forEach(b => b.onclick = () => { if (!player) return; const s = b.dataset.emote; player.target = null; if (s === 'attack') return hitDummy(); player.setState(player.state === s && (s === 'sit' || s === 'meditate') ? 'idle' : s); });
+document.querySelectorAll('[data-emote]').forEach(b => b.onclick = () => { if (!player) return; const s = b.dataset.emote; player.target = null; if (s === 'attack') return hitDummy(); player.setState(player.state === s && (s === 'sit' || s === 'meditate') ? 'idle' : s); rt?.bcast('emote', { id: me.id, s: player.state, x: player.root.position.x, z: player.root.position.z }); });
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { const I = ISLANDS[b.dataset.go]; const off = b.dataset.go === 'main' ? 9 : b.dataset.go === 'temple' ? -11 : 7; const p = new THREE.Vector3(I.x + (b.dataset.go === 'mount' ? -off : 0), 0, I.z + (b.dataset.go === 'mount' ? 0 : off));
   const delta = p.clone().sub(player.root.position); player.root.position.copy(p); player.target = null; camera.position.add(delta); controls.target.add(delta); marker.visible = false; toast(`抵達 ${I.name}`); });
 $('#helpBtn').onclick = () => modal(`<h2>❔ 玩法</h2><ul><li>點地面移動，或用 WASD／方向鍵</li><li>拖曳旋轉視角，滾輪／雙指縮放</li><li>點其他俠客看留言</li><li>汴京中央 <b>鑑石</b> 可無限抽獎；虹橋上的燈籠記錄相識天數</li><li>桃溪村許願池放紙船、願望榜看所有願望</li><li>三清山點仙鶴聽江湖小語，走到木樁旁按「攻擊」</li><li>楓林小駐點宅邸開照片牆</li><li>磁州孔廟點香爐，把醉落嫣紅踢進爐裡獻祭</li><li>右上切換晝夜與季節，右側做表情</li></ul><p><button class="ghost" id="rst">清除本機所有資料（測試用）</button></p>`) || ($('#rst').onclick = async () => { if (confirm('確定清除？')) { await db.resetAll(); location.reload(); } });
 
 function moveAvatar(a, dt) { let dir = null;
   if (a.isMe) { const f = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0), r = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
-    if (f || r) { const fw = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(), rt = new THREE.Vector3().crossVectors(fw, new THREE.Vector3(0, 1, 0)); dir = fw.multiplyScalar(f).add(rt.multiplyScalar(r)).normalize(); a.target = null; marker.visible = false; pendingAttack = false; } }
-  if (!dir && a.target) { const d = a.target.clone().sub(a.root.position).setY(0); if (d.length() < .25) { a.target = null; if (a.isMe) { marker.visible = false; if (pendingAttack) { pendingAttack = false; hitDummy(); } } } else dir = d.normalize(); }
+    if (f || r) { const fw = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(), rt = new THREE.Vector3().crossVectors(fw, new THREE.Vector3(0, 1, 0)); dir = fw.multiplyScalar(f).add(rt.multiplyScalar(r)).normalize(); a.target = null; marker.visible = false; pendingAttack = false; pendingAct = null; } }
+  let rem = Infinity; if (!dir && a.target) { const d = a.target.clone().sub(a.root.position).setY(0); rem = d.length(); if (rem < .25) { a.target = null; if (a.isMe) { marker.visible = false; if (pendingAttack) { pendingAttack = false; hitDummy(); } if (pendingAct) { const pa = pendingAct; pendingAct = null; doAct(pa); } } } else dir = d.normalize(); }
   a.moving = !!dir; if (!dir) return;
   if (a.state !== 'idle' && a.state !== 'attack') a.setState('idle');
-  const p = a.root.position, nx = p.x + dir.x * a.speed * dt, nz = p.z + dir.z * a.speed * dt;
+  const p = a.root.position, step = Math.min(a.speed * dt, rem), nx = p.x + dir.x * step, nz = p.z + dir.z * step;
   if (walkable(nx, nz)) { p.x = nx; p.z = nz; } else if (walkable(nx, p.z)) p.x = nx; else if (walkable(p.x, nz)) p.z = nz; else { a.target = null; a.moving = false; }
-  p.y = heightAt(p.x, p.z); const ang = Math.atan2(dir.x, dir.z); let dA = ang - a.root.rotation.y; dA = Math.atan2(Math.sin(dA), Math.cos(dA)); a.root.rotation.y += dA * Math.min(1, dt * 12); }
-function npc(a, dt) { a.nextAct -= dt; if (a.nextAct > 0) return; a.nextAct = 3 + Math.random() * 6; const r = Math.random();
+  p.y = heightAt(p.x, p.z); const ang = Math.atan2(dir.x, dir.z); const cur = Math.atan2(Math.sin(a.root.rotation.y), Math.cos(a.root.rotation.y)); let dA = ang - cur; dA = Math.atan2(Math.sin(dA), Math.cos(dA)); a.root.rotation.y = cur + dA * Math.min(1, dt * 12); }
+function npc(a, dt) { if (a.online) return; a.nextAct -= dt; if (a.nextAct > 0) return; a.nextAct = 3 + Math.random() * 6; const r = Math.random();
   if (r < .5) { const t = a.home.clone().add(new THREE.Vector3((Math.random() - .5) * 8, 0, (Math.random() - .5) * 8)); if (walkable(t.x, t.z)) a.target = t; }
   else a.setState(['wave', 'bow', 'sit', 'meditate', 'idle'][Math.floor(Math.random() * 5)]); }
 
 // ===== Loop =====
-const clock = new THREE.Clock(); let lastSave = 0, lastPlace = '';
+const clock = new THREE.Clock(); let lastBc = 0, lastSave = 0, lastPlace = '';
 function loop() { requestAnimationFrame(loop); const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
   updateEnv(dt, t); updFireworks(dt); updKick(dt); world.decor.update(dt, t);
   world.gem.rotation.y += dt * (1 + gemSpin * 8); gemSpin = Math.max(0, gemSpin - dt); world.gem.position.y = 5.6 + Math.sin(t * 2) * .2;
@@ -213,6 +235,7 @@ function loop() { requestAnimationFrame(loop); const dt = Math.min(clock.getDelt
   }
   if (player) {
     $('#attackBtn').classList.toggle('hidden', !nearDummy()); const pl = ISLANDS[islandAt(player.root.position.x, player.root.position.z)].name; if (pl !== lastPlace) { lastPlace = pl; $('#place').textContent = '📍 ' + pl; }
+    if (rt && t - lastBc > (player.moving ? .2 : 1.5)) { lastBc = t; const p = player.root.position; rt.bcast('move', { id: me.id, x: +p.x.toFixed(2), z: +p.z.toFixed(2), tx: player.target ? +player.target.x.toFixed(2) : null, tz: player.target ? +player.target.z.toFixed(2) : null, s: player.state }); }
     if (t - lastSave > 5) { lastSave = t; const p = player.root.position; db.updateAppearance(me.id, { pos: [+p.x.toFixed(1), 0, +p.z.toFixed(1)] }); }
     marker.rotation.z += dt * 2; }
   controls.update(); renderer.render(scene, camera); }
@@ -239,11 +262,27 @@ $('#enterBtn').onclick = async () => { const name = $('#nameIn').value.trim(), m
   if (!confirm(`「${message}」\n\n（留言之後可隨時修改）確定踏入江湖？`)) return;
   try { me = await db.createAvatar({ ...draft, name, message, pin, pos: [0, 0, 10] }); } catch (e) { return toast(e.message === 'NAME_TAKEN' ? '這個暱稱已經有人使用了' : '連線失敗，請稍後再試'); } $('#creator').classList.add('hidden'); startWorld(); };
 
-async function startWorld() { for (const a of await db.listAvatars()) { if (a.id === me.id) continue; spawn(a); }
+async function startWorld() { for (const a of await db.listAvatars()) { if (a.id === me.id || avatars.some(x => x.data?.id === a.id)) continue; spawn(a); }
   player = spawn(me, true); player.speed = 8;
   marker = new THREE.Mesh(new THREE.RingGeometry(.5, .75, 24), new THREE.MeshBasicMaterial({ color: '#ffd84a', transparent: true, opacity: .8, side: THREE.DoubleSide })); marker.rotation.x = -Math.PI / 2; marker.visible = false; scene.add(marker);
   const p = player.root.position; controls.target.set(p.x, 1.5, p.z); camera.position.set(p.x + 10, 16, p.z + 24);
-  $('#hud').classList.remove('hidden'); await refreshBoats(); toast(`歡迎 ${esc(me.name)} 踏入江湖！點地面移動 ✦`); }
+  $('#hud').classList.remove('hidden'); await refreshBoats(); toast(`歡迎 ${esc(me.name)} 踏入江湖！點地面移動 ✦`);
+  await refreshFlowers(); startRealtime(); showInbox(); }
+const byId = id => avatars.find(a => a.data?.id === id);
+async function refreshFlowers() { try { const fc = await db.flowerCounts(); for (const a of avatars) { const n = fc[a.data.id] || 0; if (n !== (a.flowers || 0)) a.setTag({ flowers: n }); } } catch (e) { console.warn('flowers', e); } }
+async function showInbox() { let ib; try { ib = await db.fetchInbox(me.id); } catch { return; } if (!ib.length) return;
+  const lines = ib.slice(-8).map(x => `<b>${esc(x.from_name)}</b> ${ACT_MSG[x.type] || x.type}`); setTimeout(() => toast(`📬 你不在時：<br>${lines.join('<br>')}${ib.length > 8 ? `<br>…等共 ${ib.length} 則` : ''}`, 7000), 2800); }
+let rt = null;
+function startRealtime() { rt = connectRealtime(me, {
+  presence: ids => { for (const a of avatars) { if (a.isMe) continue; const on = ids.has(a.data.id); if (on !== !!a.online) { a.setTag({ online: on }); if (!on) a.home.copy(a.root.position); } } if ([...ids].some(id => !byId(id))) syncOthers(); },
+  ready: () => { lastBc = -9; },
+  move: m => { const a = byId(m.id); if (!a || a.isMe) return; if (!a.online) a.setTag({ online: true }); const p = a.root.position;
+    if (Math.hypot(p.x - m.x, p.z - m.z) > 6) { p.set(m.x, heightAt(m.x, m.z), m.z); a.target = null; }
+    a.target = m.tx != null ? new THREE.Vector3(m.tx, 0, m.tz) : (Math.hypot(p.x - m.x, p.z - m.z) > 1.2 ? new THREE.Vector3(m.x, 0, m.z) : (Math.hypot(p.x - m.x, p.z - m.z) > .05 ? (p.set(m.x, heightAt(m.x, m.z), m.z), null) : null));
+    if (!a.target && m.s && a.state !== m.s && ['sit', 'meditate'].includes(m.s)) a.setState(m.s); },
+  emote: m => { const a = byId(m.id); if (!a || a.isMe) return; a.target = null; a.root.position.set(m.x, heightAt(m.x, m.z), m.z); a.setState(m.s); },
+  act: m => { const s = byId(m.from), d = m.to === me.id ? player : byId(m.to); if (!s || !d) return; s.root.position.set(m.x, heightAt(m.x, m.z), m.z); s.target = null; playAct(s, d, m.type); },
+}); }
 
 const showPanel = id => ['choose', 'pickCls', 'loginPanel'].forEach(p => $('#' + p).classList.toggle('hidden', p !== id));
 $('#newBtn').onclick = () => showPanel('pickCls'); $('#loginBtn').onclick = () => { showPanel('loginPanel'); $('#rName').focus(); };
@@ -263,12 +302,12 @@ $('#msgBtn').onclick = () => { if (!me) return; const need = !db.hasPin();
     try { me.message = await db.updateMessage(me.name, msg, pin); if (player) player.data.message = me.message; closeModal(); toast('留言已更新 ✦'); }
     catch (e) { toast(e.message === 'BAD_PIN' ? '密語不正確' + (need ? '' : '，請重新輸入') : e.message === 'TOO_MANY_ATTEMPTS' ? '嘗試太多次了，請 10 分鐘後再試' : '連線失敗，請稍後再試'); if (e.message === 'BAD_PIN' && !need) $('#msgBtn').click(); } }; };
 // 每 15 秒同步其他俠客與紙船
-async function syncOthers() { if (!me) return; try { const known = new Set(avatars.map(a => a.data?.id));
-  for (const a of await db.listAvatars()) { if (a.id === me.id) continue; if (!known.has(a.id)) spawn(a); else { const av = avatars.find(x => x.data?.id === a.id); if (av) av.data.message = a.message; } }
-  if (world.boatGroup.children.length !== (await db.listWishes()).slice(0, 20).length) await refreshBoats(); } catch (e) { console.warn('sync', e); } }
+async function syncOthers() { if (!me) return; try { const list = await db.listAvatars(); const known = new Set(avatars.map(a => a.data?.id));
+  for (const a of list) { if (a.id === me.id) continue; if (!known.has(a.id)) { known.add(a.id); spawn(a); } else { const av = avatars.find(x => x.data?.id === a.id); if (av) av.data.message = a.message; } }
+  if (world.boatGroup.children.length !== (await db.listWishes()).slice(0, 20).length) await refreshBoats(); await refreshFlowers(); } catch (e) { console.warn('sync', e); } }
 setInterval(syncOthers, 15000);
 applySeason(); updDayBtn(); buildEntry(); loop();
 // 開場：慢慢環繞全景
 controls.autoRotate = false;
 me = await db.getMe(); if (me) { $('#entry').classList.add('hidden'); startWorld(); }
-window.__nsh = { K, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };
+window.__nsh = { K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };

@@ -7,14 +7,17 @@ const M = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat
 const rot = (m, x = 0, y = 0, z = 0) => { m.rotation.set(x, y, z); return m; };
 const darken = (hex, f = .8) => new THREE.Color(hex).multiplyScalar(f);
 
-export function makeTag(text, color, textColor = '#fff', sub = '') {
+export function makeTag(text, color, textColor = '#fff', opts = {}) {
   const c = document.createElement('canvas'); const g = c.getContext('2d');
   const font = 'bold 44px "Noto Sans TC","Noto Serif CJK TC",sans-serif';
-  g.font = font; const w = Math.ceil(g.measureText(text).width) + 56; c.width = w + 8; c.height = 76;
+  const extra = opts.flowers ? ` ✿${opts.flowers}` : ''; const dot = opts.online ? 34 : 0;
+  g.font = font; const w = Math.ceil(g.measureText(text + extra).width) + 56 + dot; c.width = w + 8; c.height = 76;
   g.font = font;
   g.fillStyle = '#5a3b2e'; rr(g, 2, 6, w + 4, 66, 33); g.fill();
   g.fillStyle = color; rr(g, 6, 4, w - 4, 60, 30); g.fill();
-  g.fillStyle = textColor; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, (w + 8) / 2, 36);
+  if (dot) { g.fillStyle = '#fff'; g.beginPath(); g.arc(40, 34, 15, 0, 7); g.fill(); g.fillStyle = '#3ddc6a'; g.beginPath(); g.arc(40, 34, 11, 0, 7); g.fill(); }
+  g.fillStyle = textColor; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, (w + 8 + dot) / 2 - (extra ? g.measureText(extra).width / 2 : 0), 36);
+  if (extra) { g.fillStyle = '#ffe3ec'; g.textAlign = 'right'; g.fillText(extra, w - 22, 36); }
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
   s.scale.set(c.width / 120, c.height / 120, 1); s.renderOrder = 10; return s;
@@ -42,7 +45,7 @@ function weapon(cls, color, parts) {
       const lamp = M(new THREE.SphereGeometry(.42, 16, 12), new THREE.MeshBasicMaterial({ color: '#eee4ff', transparent: true, opacity: .92 }), 0, .3, 0); lamp.scale.y = 1.15; lamp.castShadow = false; g.add(lamp);
       for (let i = 0; i < 6; i++) { const r = M(new THREE.TorusGeometry(.43, .015, 4, 20), c, 0, .3, 0); r.rotation.y = i * Math.PI / 6; r.scale.y = 1.15; g.add(r); }
       g.add(M(new THREE.SphereGeometry(.17, 12, 10), new THREE.MeshBasicMaterial({ color: '#a8d8ff' }), 0, .3, 0));
-      const halo = new THREE.Mesh(new THREE.SphereGeometry(.7, 16, 12), new THREE.MeshBasicMaterial({ color: '#cdb8ff', transparent: true, opacity: .18, depthWrite: false, blending: THREE.AdditiveBlending })); halo.position.y = .3; g.add(halo);
+      const halo = new THREE.Mesh(new THREE.SphereGeometry(.55, 16, 12), new THREE.MeshBasicMaterial({ color: '#cdb8ff', transparent: true, opacity: .12, depthWrite: false })); halo.position.y = .3; g.add(halo);
       g.add(M(new THREE.CylinderGeometry(.22, .28, .1, 10), c, 0, -.1, 0));
       for (const x of [-.12, 0, .12]) g.add(M(new THREE.CylinderGeometry(.025, .01, .38, 5), toon('#d9c8ff'), x, -.34, 0));
       const pl = new THREE.PointLight('#c9b6ff', 1.2, 3); pl.position.y = .3; g.add(pl);
@@ -106,6 +109,8 @@ export class Avatar {
     this.hit = new THREE.Mesh(new THREE.CylinderGeometry(.8, .8, 3, 8), new THREE.MeshBasicMaterial({ visible: false })); this.hit.position.y = 1.5; this.hit.userData.avatar = this; root.add(this.hit);
     root.traverse(o => { if (o.isMesh && o !== this.hit) o.userData.avatar = this; });
   }
+  setTag(opts) { Object.assign(this, opts); const vis = this.tag.visible; this.root.remove(this.tag); this.tag.material.map.dispose(); this.tag.material.dispose();
+    this.tag = makeTag(this.data.name, this.cls.color, this.cls.text || '#fff', { online: this.online, flowers: this.flowers }); this.tag.position.y = 3.35; this.tag.visible = vis; this.root.add(this.tag); }
   setState(s) { this.state = s; this.stateT = 0; }
   update(dt, t) {
     const p = this.parts; this.stateT += dt; const st = this.stateT;
@@ -122,10 +127,13 @@ export class Avatar {
       case 'sit': p.body.position.y = -.42; p.legL.rotation.x = p.legR.rotation.x = -1.5; p.armL.rotation.x = p.armR.rotation.x = -.4; p.head.rotation.z = Math.sin(t) * .06; break;
       case 'meditate': p.body.position.y = -.38 + Math.sin(t * 2) * .06 + .12; p.legL.rotation.set(-1.4, .9, 0); p.legR.rotation.set(-1.4, -.9, 0);
         p.armL.rotation.set(-.9, 0, -.55); p.armR.rotation.set(-.9, 0, .55); this.aura.visible = true; this.aura.scale.setScalar(1 + Math.sin(t * 3) * .1); this.aura.material.opacity = .4 + Math.sin(t * 3) * .25; break;
+      case 'pat': p.armR.rotation.set(-2.3, 0, .2 + Math.sin(st * 14) * .25); p.head.rotation.z = -.1; if (st > 2) this.setState('idle'); break;
+      case 'hit': p.body.rotation.z = Math.sin(st * 30) * .25 * Math.max(0, 1 - st); p.body.rotation.x = -.15 * Math.max(0, 1 - st); p.head.rotation.z = Math.sin(st * 20) * .2; if (st > 1.4) this.setState('idle'); break;
+      case 'spar': { const ph = (st * 2.2 + (this.sparOff || 0)) % 1; p.armR.rotation.set(ph < .5 ? -2.4 * ph * 2 : -2.4 + 3.4 * (ph - .5) * 2, 0, .3); p.armL.rotation.set(-1, 0, -.6); p.body.position.y = Math.abs(Math.sin(st * 7)) * .15; p.torso.rotation.y = Math.sin(st * 4.4) * .35; if (st > 3.2) this.setState('idle'); break; }
       case 'attack': { const ph = (st * 3) % 1; const sw = ph < .4 ? -2.8 * (ph / .4) : -2.8 + 3.8 * Math.min(1, (ph - .4) / .2);
         p.armR.rotation.set(sw, 0, .3); p.torso.rotation.y = ph < .4 ? .3 : -.4; p.body.rotation.x = ph > .4 && ph < .7 ? .12 : 0; if (st > 2) this.setState('idle'); break; }
     }
-    if (p.lampHalo) { p.lampHalo.material.opacity = .09 + Math.sin(t * 2.5) * .04; p.lamp.rotation.z = Math.sin(t * 2) * .04; }
+    if (p.lampHalo) { p.lampHalo.material.opacity = .1 + Math.sin(t * 2.5) * .04; p.lamp.rotation.z = Math.sin(t * 2) * .04; }
     if (p.ribbon) p.ribbon.rotation.y = t * .8;
     if (p.pearl) p.pearl.position.set(Math.cos(t * 2) * .9, 1.6 + Math.sin(t * 3) * .15, Math.sin(t * 2) * .9);
     if (p.wings) p.wings.forEach((w, i) => w.rotation.y = (i ? -1 : 1) * (.2 + Math.sin(t * 3) * .15));
