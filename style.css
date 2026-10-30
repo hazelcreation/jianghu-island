@@ -77,3 +77,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{border-bottom:1px
 .emotes button span{display:block;margin-top:3px;line-height:1}
 .modal{z-index:60 !important}
 .toast{z-index:70 !important}
+
+.choices{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin:18px 0 6px}
+.choice{font-size:28px;font-weight:900;padding:22px 30px;min-width:230px;border-radius:24px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.choice small{font-size:15px;font-weight:700;opacity:.75}
+.form.login{max-width:320px;margin:10px auto}
+@media (max-width:600px){.choice{font-size:22px;min-width:0;width:100%}}

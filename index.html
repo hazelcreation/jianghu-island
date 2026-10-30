@@ -13,9 +13,20 @@
 <section id="entry" class="screen">
   <div class="card big">
     <h1>江湖小島</h1>
-    <p class="sub">逆水寒好友的秘密基地 ・ 先選擇你的門派</p>
-    <div id="classGrid" class="classgrid"></div>
-    <p style="text-align:center;margin-bottom:0"><button id="recoverBtn" class="ghost">🔑 找回角色</button></p>
+    <div id="choose">
+      <p class="sub">逆水寒好友的秘密基地</p>
+      <div class="choices"><button id="newBtn" class="choice">🌸 初次登島<small>選門派・捏臉</small></button><button id="loginBtn" class="choice ghost">🔑 再次登島<small>遊戲名稱＋密語</small></button></div>
+    </div>
+    <div id="pickCls" class="hidden">
+      <p class="sub">先選擇你的門派</p>
+      <div id="classGrid" class="classgrid"></div>
+      <p style="text-align:center;margin-bottom:0"><button class="ghost toChoose">← 返回</button></p>
+    </div>
+    <div id="loginPanel" class="hidden">
+      <p class="sub">再次登島：輸入遊戲名稱與 4 位數密語</p>
+      <div class="form login"><input id="rName" placeholder="遊戲名稱" maxlength="12" autocomplete="username"><input id="rPin" type="password" inputmode="numeric" maxlength="4" placeholder="4 位數密語" autocomplete="current-password"><button id="rGo">登島</button></div>
+      <p style="text-align:center;margin-bottom:0"><button class="ghost toChoose">← 返回</button></p>
+    </div>
   </div>
 </section>
 
