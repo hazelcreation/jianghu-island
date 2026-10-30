@@ -187,7 +187,7 @@ function interact(a, type) { const tp = a.root.position; let dir = player.root.p
 async function doAct({ a, type }) { const p = player.root.position; playAct(player, a, type); rt?.bcast('act', { from: me.id, to: a.data.id, type, x: p.x, z: p.z });
   try { const ok = await db.sendInteraction(me.id, a.data.id, type); if (ok !== false) logAdd('out', a.data.name, type); } catch (e) { toast(e.message === 'RATE_LIMIT' ? '動作太頻繁了，休息一下吧～' : '連線失敗，互動未記錄'); } }
 function floatText(target, txt, color, n = 1) { for (let i = 0; i < n; i++) setTimeout(() => { const s = makeTag(txt, color); s.scale.multiplyScalar(.7); s.position.copy(target.root.position).add(new THREE.Vector3((Math.random() - .5) * 1.4, 3.1 + Math.random() * .5, (Math.random() - .5) * 1.4)); s.userData.life = 0; scene.add(s); floaters.push(s); }, i * 220); }
-function playAct(src, dst, type) { const face = (x, y) => x.root.lookAt(y.root.position.x, x.root.position.y, y.root.position.z); face(src, dst); src.target = null;
+function playAct(src, dst, type) { const face = (x, y) => { x.root.rotation.set(0, Math.atan2(y.root.position.x - x.root.position.x, y.root.position.z - x.root.position.z), 0); }; face(src, dst); src.target = null;
   switch (type) {
     case 'bow': src.setState('bow'); if (dst.state !== 'sit' && dst.state !== 'meditate' && !dst.isMe) { face(dst, src); dst.setState('bow'); } break;
     case 'flower': src.setState('wave'); floatText(dst, '✿', '#ff7fa8', 4); dst.setTag({ flowers: (dst.flowers || 0) + 1 }); break;
@@ -208,11 +208,13 @@ function moveAvatar(a, dt) { let dir = null;
   if (a.isMe) { const f = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0), r = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
     if (f || r) { const fw = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(), rt = new THREE.Vector3().crossVectors(fw, new THREE.Vector3(0, 1, 0)); dir = fw.multiplyScalar(f).add(rt.multiplyScalar(r)).normalize(); a.target = null; marker.visible = false; pendingAttack = false; pendingAct = null; } }
   let rem = Infinity; if (!dir && a.target) { const d = a.target.clone().sub(a.root.position).setY(0); rem = d.length(); if (rem < .25) { a.target = null; if (a.isMe) { marker.visible = false; if (pendingAttack) { pendingAttack = false; hitDummy(); } if (pendingAct) { const pa = pendingAct; pendingAct = null; doAct(pa); } } } else dir = d.normalize(); }
-  a.moving = !!dir; if (!dir) return;
+  a.moving = !!dir; if (!dir) { if (!a.isMe && a.netYaw != null && a.online) { const r = a.root.rotation; let d = a.netYaw - r.y; d = Math.atan2(Math.sin(d), Math.cos(d)); r.set(0, r.y + d * Math.min(1, dt * 8), 0); } return; }
   if (a.state !== 'idle' && a.state !== 'attack') a.setState('idle');
-  const p = a.root.position, step = Math.min(a.speed * dt, rem), nx = p.x + dir.x * step, nz = p.z + dir.z * step;
+  const p = a.root.position, ox = p.x, oz = p.z, step = Math.min(a.speed * dt, rem), nx = p.x + dir.x * step, nz = p.z + dir.z * step;
   if (walkable(nx, nz)) { p.x = nx; p.z = nz; } else if (walkable(nx, p.z)) p.x = nx; else if (walkable(p.x, nz)) p.z = nz; else { a.target = null; a.moving = false; }
-  p.y = heightAt(p.x, p.z); const ang = Math.atan2(dir.x, dir.z); const cur = Math.atan2(Math.sin(a.root.rotation.y), Math.cos(a.root.rotation.y)); let dA = ang - cur; dA = Math.atan2(Math.sin(dA), Math.cos(dA)); a.root.rotation.y = cur + dA * Math.min(1, dt * 12); }
+  p.y = heightAt(p.x, p.z); faceMotion(a, p.x - ox, p.z - oz, dt); }
+// heading comes only from actual displacement; yaw-only (x/z forced 0) so Euler never flips to (π, π-y, π)
+function faceMotion(a, dx, dz, dt) { if (dx * dx + dz * dz < 1e-8) return; const r = a.root.rotation, cur = Math.atan2(Math.sin(r.y), Math.cos(r.y)), ang = Math.atan2(dx, dz); let dA = ang - cur; dA = Math.atan2(Math.sin(dA), Math.cos(dA)); r.set(0, cur + dA * Math.min(1, dt * 12), 0); }
 function npc(a, dt) { if (a.online) return; a.nextAct -= dt; if (a.nextAct > 0) return; a.nextAct = 3 + Math.random() * 6; const r = Math.random();
   if (r < .5) { const t = a.home.clone().add(new THREE.Vector3((Math.random() - .5) * 8, 0, (Math.random() - .5) * 8)); if (walkable(t.x, t.z)) a.target = t; }
   else a.setState(['wave', 'bow', 'sit', 'meditate', 'idle'][Math.floor(Math.random() * 5)]); }
@@ -235,7 +237,7 @@ function loop() { requestAnimationFrame(loop); const dt = Math.min(clock.getDelt
   }
   if (player) {
     $('#attackBtn').classList.toggle('hidden', !nearDummy()); const pl = ISLANDS[islandAt(player.root.position.x, player.root.position.z)].name; if (pl !== lastPlace) { lastPlace = pl; $('#place').textContent = '📍 ' + pl; }
-    if (rt && t - lastBc > (player.moving ? .2 : 1.5)) { lastBc = t; const p = player.root.position; rt.bcast('move', { id: me.id, x: +p.x.toFixed(2), z: +p.z.toFixed(2), tx: player.target ? +player.target.x.toFixed(2) : null, tz: player.target ? +player.target.z.toFixed(2) : null, s: player.state }); }
+    if (rt && t - lastBc > (player.moving ? .2 : 1.5)) { lastBc = t; const p = player.root.position; rt.bcast('move', { id: me.id, x: +p.x.toFixed(2), z: +p.z.toFixed(2), tx: player.target ? +player.target.x.toFixed(2) : null, tz: player.target ? +player.target.z.toFixed(2) : null, r: +Math.atan2(Math.sin(player.root.rotation.y), Math.cos(player.root.rotation.y)).toFixed(3), s: player.state }); }
     if (t - lastSave > 5) { lastSave = t; const p = player.root.position; db.updateAppearance(me.id, { pos: [+p.x.toFixed(1), 0, +p.z.toFixed(1)] }); }
     marker.rotation.z += dt * 2; }
   controls.update(); renderer.render(scene, camera); }
@@ -291,9 +293,10 @@ let rt = null;
 function startRealtime() { rt = connectRealtime(me, {
   presence: ids => { for (const a of avatars) { if (a.isMe) continue; const on = ids.has(a.data.id); if (on !== !!a.online) { a.setTag({ online: on }); if (!on) a.home.copy(a.root.position); } } if ([...ids].some(id => !byId(id))) syncOthers(); },
   ready: () => { lastBc = -9; },
-  move: m => { const a = byId(m.id); if (!a || a.isMe) return; if (!a.online) a.setTag({ online: true }); const p = a.root.position;
-    if (Math.hypot(p.x - m.x, p.z - m.z) > 6) { p.set(m.x, heightAt(m.x, m.z), m.z); a.target = null; }
-    a.target = m.tx != null ? new THREE.Vector3(m.tx, 0, m.tz) : (Math.hypot(p.x - m.x, p.z - m.z) > 1.2 ? new THREE.Vector3(m.x, 0, m.z) : (Math.hypot(p.x - m.x, p.z - m.z) > .05 ? (p.set(m.x, heightAt(m.x, m.z), m.z), null) : null));
+  move: m => { const a = byId(m.id); if (!a || a.isMe) return; if (!a.online) a.setTag({ online: true }); const p = a.root.position; a.speed = 8; if (m.r != null) a.netYaw = m.r;
+    if (Math.hypot(p.x - m.x, p.z - m.z) > 6) { p.set(m.x, heightAt(m.x, m.z), m.z); a.target = null; if (m.r != null) a.root.rotation.set(0, m.r, 0); }
+    // always walk (never teleport) toward the sender's target / reported position so facing follows real displacement
+    a.target = m.tx != null ? new THREE.Vector3(m.tx, 0, m.tz) : (Math.hypot(p.x - m.x, p.z - m.z) > .05 ? new THREE.Vector3(m.x, 0, m.z) : null);
     if (!a.target && m.s && a.state !== m.s && ['sit', 'meditate'].includes(m.s)) a.setState(m.s); },
   emote: m => { const a = byId(m.id); if (!a || a.isMe) return; a.target = null; a.root.position.set(m.x, heightAt(m.x, m.z), m.z); a.setState(m.s); },
   act: m => { const s = byId(m.from), d = m.to === me.id ? player : byId(m.to); if (!s || !d) return; s.root.position.set(m.x, heightAt(m.x, m.z), m.z); s.target = null; playAct(s, d, m.type); },
@@ -325,4 +328,4 @@ applySeason(); updDayBtn(); buildEntry(); loop();
 // 開場：慢慢環繞全景
 controls.autoRotate = false;
 me = await db.getMe(); if (me) { $('#entry').classList.add('hidden'); startWorld(); }
-window.__nsh = { ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };
+window.__nsh = { faceMotion, ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };
