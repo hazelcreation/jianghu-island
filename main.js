@@ -167,6 +167,16 @@ async function openPhotoWall() { const all = await db.listPhotos(); const ps = p
   $('#pu').onclick = async () => { const f = $('#pf').files[0], title = $('#pt').value.trim(), caption = $('#pc').value.trim(), huamuxue = $('#phmx').checked; if (!f) return toast('請先選擇照片'); if (!title) return toast('請輸入標題');
     $('#pst').textContent = '壓縮中…'; try { const img = await compress(f); await db.addPhoto({ img, title, caption, huamuxue, name: me.name, avatarId: me.id }); toast(`已上傳（${Math.round(img.length * .75 / 1024)}KB）`); openPhotoWall(); } catch (e) { console.error(e); $('#pst').textContent = '上傳失敗：' + (e.message === 'NOT_ALLOWED' || e.message === 'NEED_LOGIN' ? '請重新登島' : e.message); } }; }
 
+// 島上俠客
+const twTime = t => { if (!t) return ''; const d = new Date(t + 8 * 3600e3); const p = n => String(n).padStart(2, '0'); return `${d.getUTCFullYear()}/${p(d.getUTCMonth() + 1)}/${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`; };
+function peopleList() { return avatars.filter(a => a.data?.id).map(a => ({ a, on: a.isMe || !!a.online })).sort((x, y) => (y.on - x.on) || ((x.a.data.created || 0) - (y.a.data.created || 0))); }
+function updPeople() { const b = $('#peopleBtn'); if (b) b.innerHTML = `👥 島上俠客（${avatars.filter(a => a.data?.id).length}）`; }
+function openPeople() { const L = peopleList(); const n = L.filter(x => x.on).length;
+  modal(`<h2>👥 島上俠客</h2><p>共 ${L.length} 位・🟢 在線 ${n} 位</p><div class="llist plist">${L.map((x, i) => { const c = x.a.cls, d = x.a.data; return `<div class="litem prow" data-i="${i}"><span class="tag" style="background:${c.color};color:${c.text || '#fff'}">${esc(c.name)}</span><div class="pmain"><b>${esc(d.name)}</b>${x.a.isMe ? ' <small>（我）</small>' : ''}<br><small>🏝️ ${twTime(d.created)} 登島</small></div><span class="pon">${x.on ? '🟢 在線' : '<span style="opacity:.5">⚪ 離線</span>'}</span></div>`; }).join('')}</div>`);
+  document.querySelectorAll('.prow').forEach(r => r.onclick = () => { const a = L[+r.dataset.i].a; if (!a.isMe) showAvatar(a); }); }
+$('#peopleBtn').onclick = openPeople;
+setInterval(updPeople, 3000);
+
 // 燈箱
 function openLightbox(list, idx) { document.querySelector('.lbx')?.remove(); const d = document.createElement('div'); d.className = 'lbx'; document.body.appendChild(d);
   const show = () => { const p = list[idx]; d.innerHTML = `<button class="lbx-x" aria-label="關閉">×</button>${list.length > 1 ? '<button class="lbx-nav lbx-p" aria-label="上一張">‹</button><button class="lbx-nav lbx-n" aria-label="下一張">›</button>' : ''}<figure><img src="${p.img}" alt=""><figcaption>${p.hmx ? '<span class="hmx">花沐雪</span> ' : ''}<b>${esc(p.title)}</b>${p.caption ? `<p>${esc(p.caption)}</p>` : ''}<small>📷 ${esc(p.name)} ・ ${fmtDate(p.created)}　${idx + 1}/${list.length}</small></figcaption></figure>`;
@@ -375,4 +385,4 @@ applySeason(); updDayBtn(); buildEntry(); loop();
 // 開場：慢慢環繞全景
 controls.autoRotate = false;
 me = await db.getMe(); if (me?.banned) { me = null; kickBanned(); } if (me) { $('#entry').classList.add('hidden'); startWorld(); }
-window.__nsh = { openLightbox, openAdmin, openPhotoWall, get isAdmin() { return isAdmin; }, faceMotion, ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };
+window.__nsh = { openPeople, openLightbox, openAdmin, openPhotoWall, get isAdmin() { return isAdmin; }, faceMotion, ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };

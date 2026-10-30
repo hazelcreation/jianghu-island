@@ -148,3 +148,8 @@ button.danger{background:#c0392b;color:#fff}
 .lbx-p{left:8px}.lbx-n{right:8px}
 @media (max-width:480px){.lbx-nav{width:36px;height:54px;font-size:30px;background:#0004}.lbx img{max-height:64vh}}
 .lbx-nav:active{transform:translateY(-50%)}.lbx-x:active{transform:none}
+
+.prow{display:flex;align-items:center;gap:8px;cursor:pointer}.prow:hover{background:#fff4e0}
+.prow .tag{flex-shrink:0;font-size:12px;padding:2px 8px;border-radius:9px;min-width:44px;text-align:center}
+.pmain{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.pmain b{word-break:break-all}
+.pon{flex-shrink:0;font-size:13px;white-space:nowrap}
