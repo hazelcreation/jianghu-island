@@ -146,7 +146,7 @@ const aimLine = (() => { const g = new THREE.Group(); for (let i = 1; i < 8; i++
 function offering() { const bp = TP.burnerPos; let n = 0; const iv = setInterval(() => { const s = new THREE.Mesh(new THREE.SphereGeometry(.9, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: .9, depthWrite: false }));
     s.position.set(bp.x + (Math.random() - .5) * .4, 2.8, bp.z + (Math.random() - .5) * .4); s.userData.life = 0; scene.add(s); smoke.push(s); if (++n > 70) clearInterval(iv); }, 80);
   controls.target.set(bp.x, 6, bp.z); camera.position.set(bp.x - 8, 8, bp.z - 18);
-  setTimeout(() => { $('#modal').classList.add('low'); modal(`<h2 style="text-align:center">🙏 獻祭成功</h2><p style="text-align:center">醉落嫣紅化作一縷白煙，裊裊升天…<br>（放心，她等等就會回來）</p><p style="text-align:center"><button id="again">再踢一次</button></p>`); $('#again').onclick = () => { closeModal(); resetBall(); }; }, 1600);
+  setTimeout(() => { $('#modal').classList.add('low'); modal(`<h2 style="text-align:center">🙏 獻祭成功</h2><p style="text-align:center">醉落嫣紅化作一縷白煙，裊裊升天…<br>（放心，他等等就會回來）</p><p style="text-align:center"><button id="again">再踢一次</button></p>`); $('#again').onclick = () => { closeModal(); resetBall(); }; }, 1600);
   setTimeout(resetBall, 6000); }
 function resetBall() { if (K.st !== 'done') return; const b = TP.ball; b.visible = true; b.position.copy(TP.kickSpot); b.rotation.set(0, 0, 0); K.st = 'aim'; K.power = 0; updKickUI(); }
 
