@@ -192,6 +192,9 @@ function openLightbox(list, idx) { document.querySelector('.lbx')?.remove(); con
 let isAdmin = false;
 function confirmBox(text) { return new Promise(res => { const d = document.createElement('div'); d.className = 'cfm'; d.innerHTML = `<div class="mcard"><p>${text}</p><div class="row"><button class="ghost" data-v="0">取消</button><button class="danger" data-v="1">確定</button></div></div>`; document.body.appendChild(d);
   d.querySelectorAll('button').forEach(b => b.onclick = () => { d.remove(); res(b.dataset.v === '1'); }); }); }
+function typeConfirm(name) { return new Promise(res => { const d = document.createElement('div'); d.className = 'cfm'; d.innerHTML = `<div class="mcard"><p>⚠️ 此動作<b>無法復原</b>。<br>請輸入角色名稱「${esc(name)}」以確認：</p><input id="tcIn" autocomplete="off" style="width:100%;margin-top:6px"><div class="row"><button class="ghost" data-v="0">取消</button><button class="danger" data-v="1" disabled>確定永久刪除</button></div></div>`; document.body.appendChild(d);
+  const ok = d.querySelector('[data-v="1"]'), inp = d.querySelector('#tcIn'); inp.oninput = () => ok.disabled = inp.value.trim() !== name; inp.focus();
+  d.querySelectorAll('button').forEach(b => b.onclick = () => { if (b.disabled) return; d.remove(); res(b.dataset.v === '1'); }); }); }
 function bindAdminDel(after) { if (!isAdmin) return;
   document.querySelectorAll('.adel[data-wid]').forEach(b => b.onclick = async e => { e.stopPropagation(); if (!await confirmBox('確定刪除這個願望？此動作無法復原。')) return;
     try { await db.adminCall('admin_delete_wish', me.name, { p_wish: b.dataset.wid }); toast('已刪除願望'); await refreshBoats(); after(); } catch (er) { toast('刪除失敗：' + er.message); } });
@@ -204,9 +207,13 @@ async function openAdmin(tab) { if (!isAdmin) return; if (typeof tab === 'string
   const L = $('#alist');
   try {
     if (adminTab === 'players') { const ps = await db.adminCall('admin_list_players', me.name);
-      L.innerHTML = ps.map(p => `<div class="litem arow"><div><b>${esc(p.name)}</b>${p.is_admin ? ' 🛡️' : ''}${p.banned ? ' <span class="hmx ban">已封禁</span>' : ''}<br><small>${esc(p.message || '（無留言）')}</small></div><div class="abtns">${p.is_admin ? '' : `<button class="${p.banned ? 'ghost' : 'danger'}" data-ban="${p.id}" data-b="${p.banned ? 0 : 1}" data-n="${esc(p.name)}">${p.banned ? '解封' : '封禁'}</button>`}${p.message ? `<button class="ghost" data-clr="${p.id}" data-n="${esc(p.name)}">清除留言</button>` : ''}</div></div>`).join('') || '<div class="lempty">沒有俠客</div>';
+      L.innerHTML = ps.map(p => `<div class="litem arow"><div><b>${esc(p.name)}</b>${p.is_admin ? ' 🛡️' : ''}${p.banned ? ' <span class="hmx ban">已封禁</span>' : ''}<br><small>${esc(p.message || '（無留言）')}</small></div><div class="abtns">${p.is_admin ? '' : `<button class="${p.banned ? 'ghost' : 'danger'}" data-ban="${p.id}" data-b="${p.banned ? 0 : 1}" data-n="${esc(p.name)}">${p.banned ? '解封' : '封禁'}</button>`}${p.is_admin ? '' : `<button class="danger" data-del="${p.id}" data-n="${esc(p.name)}">刪除角色</button>`}${p.message ? `<button class="ghost" data-clr="${p.id}" data-n="${esc(p.name)}">清除留言</button>` : ''}</div></div>`).join('') || '<div class="lempty">沒有俠客</div>';
       L.querySelectorAll('[data-ban]').forEach(b => b.onclick = async () => { const ban = b.dataset.b === '1'; if (!await confirmBox(`確定${ban ? '封禁' : '解封'}「${b.dataset.n}」？`)) return;
         try { await db.adminCall('admin_set_banned', me.name, { p_target: b.dataset.ban, p_banned: ban }); toast(ban ? '已封禁' : '已解封'); if (ban) removeAvatar(b.dataset.ban); else syncOthers(); openAdmin(); } catch (er) { toast('失敗：' + er.message); } });
+      L.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { const n = b.dataset.n;
+        if (!await confirmBox(`確定要刪除角色「${esc(n)}」？<br><small>將永久刪除此角色及其願望、照片、互動紀錄、抽獎紀錄。</small>`)) return;
+        if (!await typeConfirm(n)) return;
+        try { const paths = await db.adminDeleteCharacter(me.name, b.dataset.del); if (paths == null) toast('角色不存在'); else { removeAvatar(b.dataset.del); toast(`已永久刪除「${esc(n)}」`); refreshBoats(); } openAdmin(); } catch (er) { toast('刪除失敗：' + er.message); } });
       L.querySelectorAll('[data-clr]').forEach(b => b.onclick = async () => { if (!await confirmBox(`確定清除「${b.dataset.n}」的留言？`)) return;
         try { await db.adminCall('admin_clear_message', me.name, { p_target: b.dataset.clr }); const a = byId(b.dataset.clr); if (a) a.data.message = '（留言已被管理員清除）'; toast('已清除留言'); openAdmin(); } catch (er) { toast('失敗：' + er.message); } });
     } else if (adminTab === 'wishes') { const ws = await db.listWishes();
@@ -217,7 +224,7 @@ async function openAdmin(tab) { if (!isAdmin) return; if (typeof tab === 'string
 function removeAvatar(id) { const i = avatars.findIndex(a => a.data?.id === id && !a.isMe); if (i < 0) return; scene.remove(avatars[i].root); avatars.splice(i, 1); }
 async function checkAdmin() { isAdmin = await db.isAdmin(me.name); $('#adminBtn').classList.toggle('hidden', !isAdmin); }
 $('#adminBtn').onclick = () => openAdmin('players');
-function kickBanned() { localStorage.removeItem('nsh_island_v2_me'); localStorage.removeItem('nsh_island_v2_ph'); alert('此角色已被管理員封禁，無法進入小島。'); location.reload(); }
+function kickBanned(msg = '此角色已被管理員封禁，無法進入小島。') { localStorage.removeItem('nsh_island_v2_me'); localStorage.removeItem('nsh_island_v2_ph'); alert(msg); location.reload(); }
 
 // ===== 互動：點擊 / 移動 =====
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -377,12 +384,12 @@ $('#msgBtn').onclick = () => { if (!me) return; const need = !db.hasPin();
     try { me.message = await db.updateMessage(me.name, msg, pin); if (player) player.data.message = me.message; closeModal(); toast('留言已更新 ✦'); }
     catch (e) { toast(e.message === 'BAD_PIN' ? '密語不正確' + (need ? '' : '，請重新輸入') : e.message === 'TOO_MANY_ATTEMPTS' ? '嘗試太多次了，請 10 分鐘後再試' : '連線失敗，請稍後再試'); if (e.message === 'BAD_PIN' && !need) $('#msgBtn').click(); } }; };
 // 每 15 秒同步其他俠客與紙船
-async function syncOthers() { if (!me) return; try { const list = await db.listAvatars(); if (!list.some(a => a.id === me.id)) return kickBanned(); for (const a of [...avatars]) if (!a.isMe && a.data?.id && !list.some(x => x.id === a.data.id)) removeAvatar(a.data.id); const known = new Set(avatars.map(a => a.data?.id));
+async function syncOthers() { if (!me) return; try { const list = await db.listAvatars(); if (!list.some(a => a.id === me.id)) { const still = await db.getMe(); return kickBanned(still ? undefined : '此角色已被管理員刪除。'); } for (const a of [...avatars]) if (!a.isMe && a.data?.id && !list.some(x => x.id === a.data.id)) removeAvatar(a.data.id); const known = new Set(avatars.map(a => a.data?.id));
   for (const a of list) { if (a.id === me.id) continue; if (!known.has(a.id)) { known.add(a.id); spawn(a); } else { const av = avatars.find(x => x.data?.id === a.id); if (av) av.data.message = a.message; } }
   if (world.boatGroup.children.length !== (await db.listWishes()).slice(0, 20).length) await refreshBoats(); await refreshFlowers(); } catch (e) { console.warn('sync', e); } }
 setInterval(syncOthers, 15000);
 applySeason(); updDayBtn(); buildEntry(); loop();
 // 開場：慢慢環繞全景
 controls.autoRotate = false;
-me = await db.getMe(); if (me?.banned) { me = null; kickBanned(); } if (me) { $('#entry').classList.add('hidden'); startWorld(); }
+if (!(me = await db.getMe()) && localStorage.getItem('nsh_island_v2_me')) { const ok = await db.getMe(); if (!ok) { localStorage.removeItem('nsh_island_v2_me'); localStorage.removeItem('nsh_island_v2_ph'); } } if (me?.banned) { me = null; kickBanned(); } if (me) { $('#entry').classList.add('hidden'); startWorld(); }
 window.__nsh = { openPeople, openLightbox, openAdmin, openPhotoWall, get isAdmin() { return isAdmin; }, faceMotion, ilog: () => ilog, openLog, K, get rt() { return rt; }, byId, interact, get avatars() { return avatars; }, openKick, kickWith: (aim, p) => { K.aim = aim; K.power = p; kickBall(); }, db, scene, camera, controls, openGacha, openWishForm, openWishBoard, openPhotoWall, get player() { return player; }, setNight: v => { night = v; updDayBtn(); }, celebrate };

@@ -61,5 +61,7 @@ export const db = {
   async adminCall(fn, name, args = {}) { return rpc(fn, { p_name: name, p_pin_hash: local.get('ph', null), ...args }); },
   async adminDeletePhoto(name, id) { const sp = await this.adminCall('admin_delete_photo', name, { p_photo: id });
     if (sp) { const d = await fetch(`${U}/storage/v1/object/photos/${sp}`, { method: 'DELETE', headers: H }); if (!d.ok) console.warn('storage delete', await d.text()); } return sp; },
+  async adminDeleteCharacter(name, id) { const paths = await this.adminCall('admin_delete_character', name, { p_target: id });
+    for (const sp of paths || []) { const r = await fetch(`${U}/storage/v1/object/photos/${sp}`, { method: 'DELETE', headers: H }); if (!r.ok) console.warn('storage delete', sp, await r.text()); } return paths; },
   async resetAll() { localStorage.removeItem(P + 'ph'); Object.keys(localStorage).filter(k => k.startsWith(P)).forEach(k => localStorage.removeItem(k)); },
 };

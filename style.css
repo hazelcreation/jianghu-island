@@ -153,3 +153,6 @@ button.danger{background:#c0392b;color:#fff}
 .prow .tag{flex-shrink:0;font-size:12px;padding:2px 8px;border-radius:9px;min-width:44px;text-align:center}
 .pmain{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.pmain b{word-break:break-all}
 .pon{flex-shrink:0;font-size:13px;white-space:nowrap}
+
+button[disabled]{opacity:.45;cursor:not-allowed}
+.cfm input{font:inherit;padding:8px;border:2px solid #5a3a2a;border-radius:10px;box-sizing:border-box}
