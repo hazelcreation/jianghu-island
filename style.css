@@ -137,3 +137,4 @@ button.danger{background:#c0392b;color:#fff}
 .cfm .mcard{max-width:320px;width:86%;padding:18px;text-align:center}.cfm .row{display:flex;gap:10px;justify-content:center;margin-top:12px}
 @media (max-width:480px){.arow{flex-wrap:wrap}.abtns{width:100%;justify-content:flex-end}.ptabs .pill{flex:1}}
 .form label.chk{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:6px;align-self:flex-start}.form label.chk input{flex:none;width:18px;height:18px}
+.cfm .mcard{background:#fff8ec;border:3px solid #5a3a2a;border-radius:16px;box-shadow:0 8px 30px #0006;color:#3a2618;font-size:16px}
